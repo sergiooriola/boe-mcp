@@ -1,7 +1,8 @@
 # Common tasks. Deployment needs an AWS CLI profile: AWS_PROFILE=boe-mcp make deploy
 AWS_PROFILE ?= boe-mcp
-# Terraform gets short-lived credentials from the AWS CLI, whatever way the profile signs in.
-AWS_CREDENTIALS = eval "$$(aws configure export-credentials --profile $(AWS_PROFILE) --format env)"
+# Terraform gets short-lived credentials from the AWS CLI, whatever way the profile signs in. If
+# the CLI fails (an expired session), the recipe stops instead of running with other credentials.
+AWS_CREDENTIALS = creds="$$(aws configure export-credentials --profile $(AWS_PROFILE) --format env)" && eval "$$creds"
 
 .PHONY: check build plan deploy
 
