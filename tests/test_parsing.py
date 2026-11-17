@@ -60,6 +60,9 @@ def test_search_results() -> None:
         ("metadata-BOE-A-2006-22080.xml", dt.date(2026, 10, 12), Status.REPEAL_SCHEDULED),
         ("metadata-BOE-A-2006-22080.xml", dt.date(2027, 1, 2), Status.REPEALED),
         ("metadata-BOE-A-1992-26318.xml", dt.date(2026, 10, 12), Status.REPEALED),
+        # Published on 2018-12-06, in force from the next day.
+        ("metadata-BOE-A-2018-16673.xml", dt.date(2018, 12, 6), Status.NOT_YET_IN_FORCE),
+        ("metadata-BOE-A-2018-16673.xml", dt.date(2018, 12, 7), Status.IN_FORCE),
     ],
 )
 def test_status_comes_from_the_repeal_date(fixture: str, today: dt.date, status: Status) -> None:
@@ -130,6 +133,17 @@ def test_block_without_versions_is_rejected() -> None:
 
     with pytest.raises(parsing.ParseError):
         parsing.parse_block(data)
+
+
+def test_images_inside_paragraphs_and_cells_leave_a_marker() -> None:
+    version = ET.fromstring(
+        """<version><p>Fórmula: <img src="a.png"/> donde x es</p>
+        <table><tr><td><img src="b.png"/></td><td>Valor</td></tr></table></version>"""
+    )
+
+    assert parsing.version_text(version) == (
+        f"Fórmula: {parsing.IMAGE_OMITTED} donde x es\n\n{parsing.IMAGE_OMITTED} | Valor"
+    )
 
 
 def test_version_text_flattens_tables_and_omits_images() -> None:

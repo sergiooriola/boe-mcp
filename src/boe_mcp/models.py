@@ -89,6 +89,7 @@ class Status(StrEnum):
     """Whether a rule is in force on the day it is asked about."""
 
     IN_FORCE = "in_force"
+    NOT_YET_IN_FORCE = "not_yet_in_force"
     REPEAL_SCHEDULED = "repeal_scheduled"
     REPEALED = "repealed"
     ANNULLED = "annulled"

@@ -23,6 +23,7 @@ from boe_mcp.models import (
 )
 
 MAX_BLOCK_CHARS = 20_000
+IMAGE_OMITTED = "[Imagen omitida: consúltela en boe.es]"
 
 _SECTION_CODE: TypeAdapter[SectionCode] = TypeAdapter(SectionCode)
 _LAW_ID_ORDER = re.compile(r"-(\d{4})-(\d+)$")
@@ -195,16 +196,20 @@ def status_on(metadata: Metadata, today: dt.date) -> Status:
     """Whether the rule is in force on `today`.
 
     The BOE can record a repeal that takes effect later with the repeal flag still unset, so the
-    status comes from the repeal date when there is one, not from the flag alone.
+    status comes from the dates when there are any, not from the flags alone.
     """
     if metadata.annulled:
         return Status.ANNULLED
-    if metadata.repeal_date is not None:
-        return Status.REPEALED if metadata.repeal_date <= today else Status.REPEAL_SCHEDULED
-    if metadata.repealed_flag:
+    if metadata.repeal_date is not None and metadata.repeal_date <= today:
+        return Status.REPEALED
+    if metadata.repeal_date is None and metadata.repealed_flag:
         return Status.REPEALED
     if metadata.expired:
         return Status.EXPIRED
+    if metadata.in_force_from is not None and metadata.in_force_from > today:
+        return Status.NOT_YET_IN_FORCE
+    if metadata.repeal_date is not None:
+        return Status.REPEAL_SCHEDULED
     return Status.IN_FORCE
 
 
@@ -265,17 +270,15 @@ def version_text(version: ET.Element) -> str:
     """Render a version as plain text: paragraphs, table rows and notes."""
     parts: list[str] = []
     for child in version:
-        if child.tag == "p":
-            parts.append(_flatten(child))
-        elif child.tag == "table":
+        if child.tag == "table":
             parts.extend(
                 " | ".join(_flatten(cell) for cell in row if cell.tag in ("td", "th"))
                 for row in child.iter("tr")
             )
         elif child.tag == "blockquote":
             parts.extend(f"Nota: {_flatten(note)}" for note in child.iter("p"))
-        elif child.tag == "img":
-            parts.append("[Imagen omitida: consúltela en boe.es]")
+        else:
+            parts.append(_flatten(child))
     return "\n\n".join(part for part in parts if part)
 
 
@@ -288,7 +291,21 @@ def truncate(text: str, limit: int = MAX_BLOCK_CHARS) -> tuple[str, bool]:
 
 
 def _flatten(element: ET.Element) -> str:
-    return _WHITESPACE.sub(" ", "".join(element.itertext())).strip()
+    """Text of an element and its descendants, with a marker where an image was."""
+    parts: list[str] = []
+
+    def walk(node: ET.Element) -> None:
+        if node.tag == "img":
+            parts.append(f" {IMAGE_OMITTED} ")
+        elif node.text:
+            parts.append(node.text)
+        for child in node:
+            walk(child)
+            if child.tail:
+                parts.append(child.tail)
+
+    walk(element)
+    return _WHITESPACE.sub(" ", "".join(parts)).strip()
 
 
 def _child(element: ET.Element, tag: str) -> ET.Element:
