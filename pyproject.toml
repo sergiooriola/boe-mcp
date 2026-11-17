@@ -61,8 +61,10 @@ strict = true
 files = ["src", "tests"]
 
 [tool.pytest.ini_options]
-addopts = "--strict-markers --cov=boe_mcp --cov-report=term-missing --cov-fail-under=90"
+# Live tests call the real BOE API, so they only run when asked for: pytest -m live --no-cov
+addopts = "--strict-markers -m 'not live' --cov=boe_mcp --cov-report=term-missing --cov-fail-under=90"
 testpaths = ["tests"]
+markers = ["live: calls the real BOE API; run with -m live --no-cov"]
 
 [tool.coverage.run]
 branch = true
