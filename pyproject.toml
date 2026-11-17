@@ -20,6 +20,9 @@ dependencies = [
     "uvicorn>=0.54",
 ]
 
+[project.scripts]
+boe-mcp = "boe_mcp.__main__:main"
+
 [project.urls]
 Repository = "https://github.com/sergiooriola/boe-mcp"
 
