@@ -11,3 +11,7 @@ updates:
     groups:
       python:
         patterns: ["*"]
+  - package-ecosystem: terraform
+    directories: [/infra, /infra/bootstrap]
+    schedule:
+      interval: monthly
