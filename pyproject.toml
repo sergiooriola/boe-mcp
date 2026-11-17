@@ -1,0 +1,65 @@
+[project]
+name = "boe-mcp"
+version = "0.1.0"
+description = "Remote MCP server that lets AI agents read Spain's Boletín Oficial del Estado (BOE)."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Sergio Oriola", email = "125772358+sergiooriola@users.noreply.github.com" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "anyio>=4.16",
+    "defusedxml>=0.7.1",
+    "httpx>=0.28",
+    "mcp>=2.3.0,<3",
+    "pydantic>=2.14",
+    "pyjwt[crypto]>=2.10",
+    "starlette>=1.10",
+    "uvicorn>=0.54",
+]
+
+[project.urls]
+Repository = "https://github.com/sergiooriola/boe-mcp"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.16",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.5",
+    "types-defusedxml>=0.7.0.20260504",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "B", "UP", "SIM", "C4", "RUF", "N", "S", "ASYNC", "PT", "RET", "PTH",
+    "D",
+]
+ignore = [
+    "D105", "D107", # magic methods and __init__ are documented by their class
+    "D203", "D213", # pick one docstring layout: summary on the first line, no blank before class body
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "D", "S105", "S106", "S314"]  # tests parse their own XML
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers --cov=boe_mcp --cov-report=term-missing --cov-fail-under=90"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true

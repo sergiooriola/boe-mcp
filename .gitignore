@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[oc]
+.venv/
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build output
+build/
+dist/
+*.egg-info/
+
+# Terraform: state and local configuration hold account details and secrets
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+backend.hcl
+terraform.tfvars
+
+# Personal files that never go to git
+privado/
