@@ -1,0 +1,30 @@
+name: Live BOE API
+
+# The unit tests answer from recorded BOE responses, so they keep passing if the BOE changes its
+# API. This runs the live tests every week to notice. GitHub emails a failure to whoever last
+# changed the schedule, and disables schedules in public repositories after 60 days without
+# activity: re-enable it from the Actions tab.
+on:
+  schedule:
+    - cron: "23 6 * * 1" # Mondays 06:23 UTC, away from the start of the hour, when GitHub is busiest
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    name: Live BOE API
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked
+      - name: Live tests
+        run: uv run pytest -m live --no-cov
