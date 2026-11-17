@@ -2,11 +2,12 @@ import time
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
+import anyio
 import httpx2
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
-from mcp import Client
+from mcp import Client, MCPError
 from mcp.client.streamable_http import streamable_http_client
 from pydantic import ValidationError
 from starlette.applications import Starlette
@@ -200,6 +201,21 @@ async def test_there_is_no_get_stream(app: Starlette) -> None:
 
     assert response.status_code == 405
     assert response.headers["allow"] == "POST"
+
+
+@pytest.mark.anyio
+async def test_there_are_no_listen_streams(app: Starlette) -> None:
+    async with (
+        http(app, token()) as client,
+        Client(streamable_http_client(RESOURCE, http_client=client)) as mcp,
+    ):
+        tools = mcp.server_capabilities.tools
+        with anyio.fail_after(5), pytest.raises(MCPError):
+            async with mcp.listen(tools_list_changed=True):
+                pass
+
+    assert tools is not None
+    assert not tools.list_changed
 
 
 @pytest.mark.anyio

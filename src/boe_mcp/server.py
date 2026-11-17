@@ -103,6 +103,10 @@ def create_server(
         lifespan=lifespan,
         auth=auth,
         token_verifier=token_verifier,
+        # The tools never change while a client is connected, so there is nothing to listen for.
+        # A subscriptions/listen stream stays open until the client leaves, and on Lambda it would
+        # hold the function until its timeout. Not serving it also stops advertising listChanged.
+        subscriptions=False,
     )
 
     @server.tool(title="BOE of the day", annotations=READ_ONLY)
