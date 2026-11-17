@@ -67,8 +67,14 @@ locals {
   client_defaults = {
     allowed_oauth_flows  = ["code"]
     allowed_oauth_scopes = aws_cognito_resource_server.mcp.scope_identifiers
-    # Only refresh through the API: every sign-in goes through managed login.
-    explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]
+    # Users sign in only through managed login and refresh only through /oauth2/token, so the
+    # clients need no API sign-in flow. Leaving the list empty would turn on Cognito's defaults,
+    # which include REFRESH_TOKEN_AUTH, incompatible with refresh-token rotation. This flow
+    # needs AWS administrator credentials, so it opens nothing to the internet.
+    explicit_auth_flows = ["ALLOW_ADMIN_USER_PASSWORD_AUTH"]
+    # Each refresh replaces the refresh token, so a stolen one stops working once the client
+    # uses its own. AWS recommends it for every client.
+    rotation_grace_seconds = 10
   }
 }
 
@@ -96,10 +102,9 @@ resource "aws_cognito_user_pool_client" "claude_code" {
     refresh_token = "days"
   }
 
-  # A public client's refresh token is replaced on every use, so a stolen one stops working.
   refresh_token_rotation {
     feature                    = "ENABLED"
-    retry_grace_period_seconds = 10
+    retry_grace_period_seconds = local.client_defaults.rotation_grace_seconds
   }
 }
 
@@ -124,6 +129,11 @@ resource "aws_cognito_user_pool_client" "claude_ai" {
     access_token  = "minutes"
     id_token      = "minutes"
     refresh_token = "days"
+  }
+
+  refresh_token_rotation {
+    feature                    = "ENABLED"
+    retry_grace_period_seconds = local.client_defaults.rotation_grace_seconds
   }
 }
 
