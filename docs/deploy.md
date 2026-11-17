@@ -36,10 +36,13 @@ them to Terraform with `aws configure export-credentials`.
 
 ## 3. State bucket, once
 
+Terraform takes the credentials from the shell. Each block chains its commands with `&&`, so if
+the `boe-mcp` session has expired nothing runs with whatever other credentials the shell has.
+
 ```sh
-creds=$(aws configure export-credentials --profile boe-mcp --format env) && eval "$creds"
-terraform -chdir=infra/bootstrap init
-terraform -chdir=infra/bootstrap apply
+creds=$(aws configure export-credentials --profile boe-mcp --format env) && eval "$creds" &&
+  terraform -chdir=infra/bootstrap init &&
+  terraform -chdir=infra/bootstrap apply
 ```
 
 Copy `infra/backend.hcl.example` to `infra/backend.hcl` with the bucket name it prints, and
@@ -47,7 +50,8 @@ Copy `infra/backend.hcl.example` to `infra/backend.hcl` with the bucket name it 
 alerts. Git ignores both files. Then:
 
 ```sh
-terraform -chdir=infra init -backend-config=backend.hcl
+creds=$(aws configure export-credentials --profile boe-mcp --format env) && eval "$creds" &&
+  terraform -chdir=infra init -backend-config=backend.hcl
 ```
 
 ## 4. Deploy
@@ -101,8 +105,8 @@ The user pool has deletion protection. Set `deletion_protection = "INACTIVE"` in
 `infra/auth.tf`, apply, then:
 
 ```sh
-creds=$(aws configure export-credentials --profile boe-mcp --format env) && eval "$creds"
-terraform -chdir=infra destroy
+creds=$(aws configure export-credentials --profile boe-mcp --format env) && eval "$creds" &&
+  terraform -chdir=infra destroy
 ```
 
 The state bucket stays (`prevent_destroy`); empty and delete it by hand if the account is
