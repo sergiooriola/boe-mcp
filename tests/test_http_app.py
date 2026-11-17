@@ -90,9 +90,12 @@ INITIALIZE = {
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 
 
-async def post(app: Starlette, bearer: str | None, host: str = "testserver") -> Any:
+async def post(
+    app: Starlette, bearer: str | None, host: str = "testserver", origin: str | None = None
+) -> Any:
+    headers = {**MCP_HEADERS, **({"Origin": origin} if origin else {})}
     async with http(app, bearer, host) as client:
-        return await client.post("/mcp", json=INITIALIZE, headers=MCP_HEADERS)
+        return await client.post("/mcp", json=INITIALIZE, headers=headers)
 
 
 @pytest.mark.anyio
@@ -179,6 +182,27 @@ async def test_requests_to_another_host_name_are_refused(app: Starlette) -> None
 
 
 @pytest.mark.anyio
+async def test_only_our_own_web_origin_is_accepted(app: Starlette) -> None:
+    own = await post(app, token(), origin="http://testserver")
+    other = await post(app, token(), origin="https://attacker.example")
+
+    assert own.status_code == 200
+    assert other.status_code == 403
+
+
+@pytest.mark.anyio
+async def test_there_is_no_get_stream(app: Starlette) -> None:
+    async with http(app, token()) as client:
+        response = await client.get(
+            "/mcp",
+            headers={"Accept": "text/event-stream", "MCP-Protocol-Version": "2025-11-25"},
+        )
+
+    assert response.status_code == 405
+    assert response.headers["allow"] == "POST"
+
+
+@pytest.mark.anyio
 async def test_health_check_needs_no_token(app: Starlette) -> None:
     async with http(app) as client:
         response = await client.get("/healthz")
@@ -204,3 +228,11 @@ def test_settings_come_from_the_environment() -> None:
 def test_missing_settings_stop_the_server_from_starting() -> None:
     with pytest.raises(ValidationError):
         HttpSettings.from_env({})
+
+
+@pytest.mark.parametrize(
+    "resource_url", ["https://example.com", "https://example.com/", "https://example.com/mcp/"]
+)
+def test_the_resource_url_must_be_an_endpoint_without_trailing_slash(resource_url: str) -> None:
+    with pytest.raises(ValidationError, match="endpoint path"):
+        HttpSettings.model_validate({**SETTINGS.model_dump(), "resource_url": resource_url})

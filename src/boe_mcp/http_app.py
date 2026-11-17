@@ -8,10 +8,10 @@ import httpx
 import jwt
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.transport_security import TransportSecuritySettings
-from pydantic import AnyHttpUrl, BaseModel, Field
+from pydantic import AnyHttpUrl, BaseModel, Field, field_validator
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse
+from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
 
 from boe_mcp.auth import CognitoTokenVerifier
@@ -32,6 +32,15 @@ class HttpSettings(BaseModel):
     issuer_url: AnyHttpUrl = Field(description="Cognito user pool issuer.")
     client_ids: frozenset[str] = Field(min_length=1, description="App clients allowed in.")
     required_scope: str = Field(min_length=1, description="Scope every token must carry.")
+
+    @field_validator("resource_url")
+    @classmethod
+    def _endpoint_path(cls, url: AnyHttpUrl) -> AnyHttpUrl:
+        # The URL is compared character by character with each token's audience, so it has one
+        # spelling only: an endpoint path such as /mcp, without a trailing slash.
+        if not url.path or url.path == "/" or url.path.endswith("/"):
+            raise ValueError("must name the MCP endpoint path, such as /mcp, with no trailing /")
+        return url
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] = os.environ) -> HttpSettings:
@@ -57,7 +66,7 @@ def create_app(
     jwks: jwt.PyJWKClient | None = None,
 ) -> Starlette:
     """Build the ASGI app: the MCP endpoint, its OAuth metadata and a health check."""
-    resource = str(settings.resource_url).rstrip("/")
+    resource = str(settings.resource_url)
     issuer = str(settings.issuer_url).rstrip("/")
     server = create_server(
         http_client=http_client,
@@ -74,16 +83,28 @@ def create_app(
 
     url = urlsplit(resource)
     app = server.streamable_http_app(
-        streamable_http_path=url.path or "/",
+        streamable_http_path=url.path,
         # One JSON answer per request and no session state, so any Lambda instance can serve
         # any request.
         json_response=True,
         stateless_http=True,
-        # Only requests addressed to our own host name: protection against DNS rebinding.
-        transport_security=TransportSecuritySettings(allowed_hosts=[url.netloc]),
+        # Only requests addressed to our own host name, and from no other web origin than our
+        # own: protection against DNS rebinding.
+        transport_security=TransportSecuritySettings(
+            allowed_hosts=[url.netloc], allowed_origins=[f"{url.scheme}://{url.netloc}"]
+        ),
     )
+    # Older clients may open a GET stream for server messages. A stateless server has none to
+    # send, and an open stream would keep a Lambda invocation running until it times out, so
+    # the endpoint answers GET with 405, which tells the client there is no stream.
+    app.router.routes.insert(0, Route(url.path, _no_stream, methods=["GET"]))
     app.router.routes.append(Route(HEALTH_PATH, _health, methods=["GET"]))
     return app
+
+
+async def _no_stream(_: Request) -> Response:
+    """Refuse the optional GET stream of older clients."""
+    return Response(status_code=405, headers={"Allow": "POST"})
 
 
 async def _health(_: Request) -> PlainTextResponse:
