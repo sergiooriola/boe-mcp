@@ -190,7 +190,9 @@ su clase `MCPServer`. Cada herramienta es una función de Python con un decorado
 
 ```python
 @server.tool(title="Rule status, outline and changes", annotations=READ_ONLY)
-async def get_legislation(ctx: ToolContext, law_id: Annotated[str, Field(max_length=40)]) -> Legislation:
+async def get_legislation(
+    ctx: ToolContext, law_id: Annotated[str, Field(max_length=40)]
+) -> Legislation:
     """Describe one consolidated rule: its status today, its outline and its later changes."""
 ```
 
