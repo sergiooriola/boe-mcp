@@ -34,3 +34,7 @@ jobs:
         run: uv run mypy
       - name: Tests
         run: uv run pytest
+      - name: Lambda package starts
+        run: |
+          PLATFORM=x86_64-manylinux2014 ./scripts/build-lambda.sh
+          ./scripts/smoke-test-package.sh
