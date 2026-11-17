@@ -19,6 +19,8 @@ ROUTES = {
     "boe/sumario/20261012": "summary-20261012.xml",
     "legislacion-consolidada": "search-proteccion-datos.xml",
     "legislacion-consolidada/id/BOE-A-2018-16673/metadatos": "metadata-BOE-A-2018-16673.xml",
+    "legislacion-consolidada/id/BOE-A-1992-26318/metadatos": "metadata-BOE-A-1992-26318.xml",
+    "legislacion-consolidada/id/BOE-A-1992-26318/texto/bloque/a1": "block-BOE-A-1992-26318-a1.xml",
     "legislacion-consolidada/id/BOE-A-2018-16673/analisis": "analysis-BOE-A-2018-16673.xml",
     "legislacion-consolidada/id/BOE-A-2018-16673/texto/indice": "outline-BOE-A-2018-16673.xml",
     "legislacion-consolidada/id/BOE-A-2018-16673/texto/bloque/a6": "block-BOE-A-2018-16673-a6.xml",
