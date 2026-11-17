@@ -14,14 +14,23 @@ rm -rf "$build/package" "$build/lambda.zip"
 mkdir -p "$build/package"
 
 uv export --frozen --no-dev --no-editable --no-hashes --quiet -o "$build/requirements.txt"
+# uv rebuilds a local project only when its pyproject.toml changes, not when its code does
+# (https://docs.astral.sh/uv/concepts/cache/#dynamic-metadata), so it is refreshed every time.
 uv pip install \
   --quiet \
+  --refresh-package boe-mcp \
   --no-installer-metadata \
   --no-compile-bytecode \
   --python-platform "$platform" \
   --python 3.14 \
   --target "$build/package" \
   -r "$build/requirements.txt"
+
+# The package must hold the code in src/, or a deploy would ship something else.
+if ! diff -r --exclude=__pycache__ src/boe_mcp "$build/package/boe_mcp" >/dev/null; then
+  echo "build/package/boe_mcp is not the code in src/boe_mcp. Run 'uv cache clean boe-mcp' and build again." >&2
+  exit 1
+fi
 
 cat > "$build/package/run.sh" <<'EOF'
 #!/bin/bash
