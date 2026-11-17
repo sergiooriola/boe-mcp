@@ -155,15 +155,29 @@ class BlockVersion(BaseModel):
 
 
 class LegislationBlock(BaseModel):
-    """The current wording of one block of a consolidated rule."""
+    """The wording in force today of one block of a consolidated rule."""
 
     law_id: str
     block_id: str
     kind: str = Field(description="precepto, preambulo, parte_final, firma, nota_inicial…")
     title: str
-    current_version: BlockVersion
-    text: str = Field(description="Current wording as plain text. Notes start with 'Nota:'.")
-    truncated: bool = Field(description="True when the text was cut to keep the answer short.")
-    previous_versions: list[BlockVersion] = Field(description="Oldest first.")
+    current_version: BlockVersion | None = Field(
+        description="Version in force today; null when the block only has wording that takes "
+        "effect later."
+    )
+    text: str = Field(
+        description="Wording in force today as plain text; empty when there is none. Notes "
+        "start with 'Nota:'."
+    )
+    upcoming_versions: list[BlockVersion] = Field(
+        description="Approved wordings that take effect after today, soonest first."
+    )
+    upcoming_text: str | None = Field(
+        default=None, description="Wording of the soonest upcoming version, if there is one."
+    )
+    truncated: bool = Field(description="True when a text was cut to keep the answer short.")
+    previous_versions: list[BlockVersion] = Field(
+        description="Versions no longer in force, oldest first."
+    )
     url: HttpUrl
     notice: str = CONSOLIDATED_NOTICE
