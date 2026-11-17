@@ -1,5 +1,6 @@
 """The MCP server: four read-only tools over the BOE open-data API."""
 
+import asyncio
 import datetime as dt
 import logging
 import time
@@ -36,12 +37,15 @@ from boe_mcp.models import (
     LegislationBlock,
     SearchResults,
     SectionCode,
+    Status,
 )
 
 logger = logging.getLogger(__name__)
 
 MADRID = ZoneInfo("Europe/Madrid")
 MAX_LATER_CHANGES = 30
+# A rule whose repeal is only scheduled is still in force today.
+IN_FORCE_STATUSES = frozenset({Status.IN_FORCE, Status.REPEAL_SCHEDULED})
 
 INSTRUCTIONS = """\
 Read Spain's official gazette, the Boletín Oficial del Estado (BOE), from its open-data API.
@@ -268,20 +272,21 @@ def create_server(
             Field(description="block_id from the outline of get_legislation.", max_length=80),
         ],
     ) -> LegislationBlock:
-        """Read the wording in force today of one block of a consolidated rule.
+        """Read the latest wording of one block of a consolidated rule, and whether it is in force.
 
         A block is an article, the preamble, an annex or a provision. The answer also gives any
         approved wording that takes effect later, and lists the earlier versions of the block
-        with the rules that introduced them.
+        with the rules that introduced them. Check in_force before presenting the text as law.
         """
         app = ctx.request_context.lifespan_context
-        block = await _run(
+        metadata, block = await _run(
             "read_legislation_block",
-            app.boe.block(law_id, block_id),
+            asyncio.gather(app.boe.metadata(law_id), app.boe.block(law_id, block_id)),
             not_found=f"{law_id} has no block {block_id!r}. Call get_legislation for the "
             "outline and use one of its block_id values.",
         )
         today = app.today()
+        law_status = parsing.status_on(metadata, today)
         started = [entry for entry in block.versions if _in_force_by(entry[0], today)]
         upcoming = sorted(
             (entry for entry in block.versions if not _in_force_by(entry[0], today)),
@@ -294,9 +299,11 @@ def create_server(
         )
         return LegislationBlock(
             law_id=law_id,
+            law_status=law_status,
             block_id=block_id,
             kind=block.kind,
             title=block.title,
+            in_force=current is not None and law_status in IN_FORCE_STATUSES,
             current_version=current,
             text=text,
             upcoming_versions=[version for version, _ in upcoming],

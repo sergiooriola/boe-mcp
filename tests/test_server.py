@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+import logging
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
@@ -143,6 +144,8 @@ async def test_read_block_returns_the_current_wording_and_its_history(client: Cl
     )
 
     assert block["title"] == "Artículo 23"
+    assert block["law_status"] == "in_force"
+    assert block["in_force"] is True
     assert block["current_version"]["introduced_by"] == "BOE-A-2025-26698"
     assert [version["introduced_by"] for version in block["previous_versions"]] == [
         "BOE-A-2018-16673"
@@ -152,6 +155,29 @@ async def test_read_block_returns_the_current_wording_and_its_history(client: Cl
     assert block["upcoming_text"] is None
     assert block["truncated"] is False
     assert block["url"] == "https://www.boe.es/buscar/act.php?id=BOE-A-2018-16673"
+
+
+@pytest.mark.anyio
+async def test_a_repealed_rule_keeps_its_wording_but_it_is_not_in_force(client: Client) -> None:
+    # Ley 30/1992 was repealed on 2021-04-02.
+    block = await _call(client, "read_legislation_block", law_id="BOE-A-1992-26318", block_id="a1")
+
+    assert block["law_status"] == "repealed"
+    assert block["in_force"] is False
+    assert block["current_version"]["introduced_by"] == "BOE-A-1992-26318"
+    assert block["text"]
+
+
+@pytest.mark.anyio
+async def test_search_words_never_reach_the_logs(
+    client: Client, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG)
+
+    await _call(client, "search_legislation", title_words="Fulanita Menganez")
+
+    assert "Fulanita" not in caplog.text
+    assert "tool=search_legislation outcome=ok" in caplog.text
 
 
 @pytest.mark.anyio
@@ -181,6 +207,7 @@ async def test_read_block_that_does_not_exist_yet(fake_boe: FakeBoe) -> None:
         )
 
     assert block["current_version"] is None
+    assert block["in_force"] is False
     assert block["text"] == ""
     assert block["upcoming_versions"][0]["in_force_from"] == "2018-12-07"
 

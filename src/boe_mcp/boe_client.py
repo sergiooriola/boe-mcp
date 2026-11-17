@@ -8,6 +8,7 @@ that the BOE's robots.txt allows.
 import asyncio
 import datetime as dt
 import json
+import logging
 import re
 import xml.etree.ElementTree as ET
 from importlib.metadata import version
@@ -27,6 +28,10 @@ TIMEOUT_SECONDS = 15.0
 # go into URL paths, so anything else is rejected before a request is made.
 LAW_ID = re.compile(r"^[A-Z]{2,6}-[A-Za-z]-\d{4}-\d{1,6}$")
 BLOCK_ID = re.compile(r"^[A-Za-z0-9]{1,20}(-[A-Za-z0-9]{1,20}){0,3}$")
+
+# httpx logs every request URL at INFO, and search URLs carry the words the user searched for,
+# which can name people. Its warnings and errors still get through.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 _WORD = re.compile(r"[\w/.-]+")
 _OPERATORS = frozenset({"and", "or", "not"})
@@ -117,6 +122,11 @@ class BoeClient:
         """Rules in the consolidated collection that match `query`."""
         params: dict[str, str | int] = {"query": query, "offset": offset, "limit": limit}
         return parsing.parse_search(await self._get("legislacion-consolidada", params=params))
+
+    async def metadata(self, law_id: str) -> parsing.Metadata:
+        """Metadata of a rule: what it is and the dates that decide whether it is in force."""
+        path = f"legislacion-consolidada/id/{_checked(LAW_ID, law_id)}/metadatos"
+        return parsing.parse_metadata(await self._get(path))
 
     async def legislation(
         self, law_id: str
