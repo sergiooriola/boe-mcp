@@ -397,6 +397,12 @@ la segunda petición podría llegar a una copia que no la conoce. Así que:
   mensajes del servidor. Un servidor sin estado no tiene nada que enviarles, y en Lambda ese
   flujo abierto mantendría la invocación en marcha, y facturando, hasta agotar su tiempo. El
   servidor contesta `GET` con 405, que según la especificación significa «aquí no hay flujo».
+- **Sin suscripciones a cambios.** La versión de 2026 sustituye ese `GET` por una petición,
+  `subscriptions/listen`. Su respuesta es un flujo que queda abierto para avisar de cambios,
+  por ejemplo si cambia la lista de herramientas. Aquí la lista no cambia nunca, así que el
+  servidor no ofrece esa petición (`subscriptions=False`) y tampoco anuncia que avisa de
+  cambios (`listChanged`). Por eso los clientes no la abren. El capítulo 9 cuenta cómo se
+  descubrió que hacía falta.
 - **Una sola forma de escribir la URL.** La URL del servidor se compara carácter a carácter con
   la audiencia de cada token, así que la configuración solo admite una ruta de punto de entrada
   sin barra final (`…/mcp`). Con `https://host/` frente a `https://host`, todos los tokens
@@ -614,7 +620,8 @@ Las piezas, cada una con lo que es y por qué está:
 - **AWS Lambda** ejecuta código cuando llega una petición, y se paga por petición y por
   milisegundo de ejecución. Cuando nadie lo usa, no cuesta nada. Usa procesadores **arm64**
   (Graviton), que son un 20 % más baratos por segundo. Lo malo es el **arranque en frío**: tras
-  un rato sin uso, la primera petición tarda alrededor de un segundo más.
+  un rato sin uso, la primera petición tarda unos dos segundos más. En el despliegue real se
+  midieron entre 1,6 y 2,7 s.
 - **Lambda Web Adapter** es una capa publicada por AWS que deja correr una aplicación web normal
   dentro de Lambda. Así, el mismo programa (uvicorn y la aplicación ASGI) funciona en el
   portátil, en las pruebas y en Lambda, sin código específico de Lambda. **ASGI** es el estándar
@@ -628,7 +635,11 @@ Las piezas, cada una con lo que es y por qué está:
   2. **Limita el ritmo:** 5 peticiones por segundo y ráfagas de 10. Pone un techo a la factura
      y a la carga sobre el BOE antes de que la petición llegue al código.
 - **Amazon Cognito** es el servidor de autorización del capítulo 8.
-- **CloudWatch Logs** guarda los registros 30 días.
+- **CloudWatch Logs** guarda los registros 30 días. Además de la línea de cada herramienta
+  (capítulo 6), uvicorn deja una línea de acceso por petición con la IP de quien llama, la ruta
+  y el código de respuesta. Una IP es un dato personal. Se guarda porque sirve para rastrear
+  abusos y fallos (fue la que permitió encontrar el primero de los descritos más abajo), y se
+  borra a los 30 días con el resto.
 - **IAM** (*Identity and Access Management*) es el sistema de permisos de AWS. La función
   solo tiene permiso para escribir sus propios registros, porque no necesita nada más: este es
   el principio de **mínimo privilegio**.
@@ -658,6 +669,9 @@ Terraform guarda lo que ha creado en un archivo de **estado**. Aquí vive en un 
 Linux arm64 y Python 3.14 y crea un zip **reproducible**: el mismo código produce
 exactamente el mismo zip, así que Terraform solo actualiza la función cuando cambia algo.
 
+Antes de crear el zip, el script compara el código empaquetado con el de `src/`, y se para si
+no coinciden. Abajo se explica por qué.
+
 ### Coste
 
 Para unos cientos de peticiones al mes, con los precios de eu-south-2 de noviembre de 2026:
@@ -670,6 +684,55 @@ Para unos cientos de peticiones al mes, con los precios de eu-south-2 de noviemb
 | CloudWatch Logs | 0,57 USD por GB ingerido | < 0,01 USD |
 | S3 (estado de Terraform) | Unos KB | < 0,01 USD |
 | **Total** | | **menos de 0,05 USD** |
+
+### Lo que enseñó el primer despliegue
+
+El servidor se desplegó en una cuenta miembro propia dentro de una organización de AWS
+(*AWS Organizations*), a la que se entra con IAM Identity Center. Es la práctica que recomienda
+AWS: una cuenta por carga de trabajo. Así la factura de la cuenta es la del servidor y nada más
+puede tocarlo. Los pasos están en [`docs/deploy.md`](deploy.md).
+
+El primer `terraform apply` creó los 18 recursos sin errores. Con eso quedaron resueltas tres
+dudas que las pruebas locales no podían despejar:
+
+- Cognito acepta clientes con rotación de tokens y sin flujos de inicio de sesión por API.
+- Cognito acepta el `resource` del servidor y rechaza cualquier otro con `invalid_target`.
+- La capa del Lambda Web Adapter existe en eu-south-2.
+
+Al usarlo de verdad aparecieron **dos fallos que ninguna prueba local podía ver**.
+
+**1. Cada conexión tardaba 27 segundos.**
+
+- **El síntoma:** Claude Code funcionaba, pero tardaba mucho en conectarse.
+- **Cómo se encontró:** en los registros, una petición `POST /mcp` respondía 200 y su
+  invocación terminaba en `Status: timeout` a los 25 s, con un pánico del adaptador al cortar
+  la respuesta. El registro de depuración de Claude Code (`--debug-file`) mostró que la
+  conexión era lo lento.
+- **La causa:** el servidor anunciaba que avisaba de cambios (`listChanged`), así que Claude
+  Code abría `subscriptions/listen` al conectarse. El SDK responde a esa petición con un flujo
+  que no se cierra, incluso con `json_response=True`. El adaptador de Lambda espera a la
+  respuesta completa, así que la función seguía en marcha, facturando, hasta su límite de 25 s.
+- **El arreglo:** `subscriptions=False` (capítulo 7). Una prueba nueva fallaba antes del cambio
+  y pasa después. En Lambda, la conexión bajó de 27 216 ms a 2 050 ms.
+- **La lección:** es el mismo problema que el `GET` del capítulo 7, que ya se había evitado,
+  con otra forma. Antes de desplegar en una plataforma que espera respuestas completas, hay
+  que repasar todo lo que el SDK puede responder con un flujo.
+
+**2. El paquete podía llevar código viejo.**
+
+- **El síntoma:** después de corregir el fallo anterior, Terraform dijo que no había cambios
+  que aplicar.
+- **La causa:** uv solo vuelve a compilar un proyecto local cuando cambia su `pyproject.toml`,
+  no cuando cambia su código, y está documentado
+  ([caché de uv](https://docs.astral.sh/uv/concepts/cache/#dynamic-metadata)). El zip había
+  salido idéntico, byte a byte, al ya desplegado. La CI no podía verlo, porque cada ejecución
+  empieza con la caché vacía.
+- **El arreglo:** `--refresh-package boe-mcp` obliga a recompilar el proyecto en cada paquete,
+  y la comparación con `src/` hace que un paquete viejo sea imposible de desplegar. Se
+  comprobó en los dos sentidos: con un paquete viejo en la caché la comprobación falla, y con el
+  arreglo el paquete es el correcto.
+- **La lección:** «Terraform no ve cambios» después de cambiar el código es una señal de
+  alarma, no una buena noticia.
 
 ### Lo que se descartó
 
@@ -689,7 +752,8 @@ El razonamiento completo está en la [ADR 0003](adr/0003-api-gateway-and-lambda.
 depender de probar a mano.
 **Se apoya en:** todos los anteriores.
 
-Las pruebas (82, con un 99 % de cobertura) van por capas, de la más aislada a la más completa:
+Las pruebas (83, con un 99 % de cobertura, más seis contra el BOE real) van por capas, de la
+más aislada a la más completa:
 
 1. **Análisis del XML** con respuestas reales grabadas del BOE en noviembre de 2026:
    - un día con número extraordinario;
@@ -705,10 +769,17 @@ Las pruebas (82, con un 99 % de cobertura) van por capas, de la más aislada a l
    - un cliente MCP completo con un token firmado;
    - y nueve tokens que se rechazan: otra audiencia, sin audiencia, otro emisor, caducado,
      token de identidad, cliente desconocido, firma ajena, HS256 y basura.
-   - También comprueban el 403 por falta de alcance, el 421 por otro `Host` y un cliente
-     antiguo con `initialize`.
+   - También comprueban el 403 por falta de alcance, el 421 por otro `Host`, un cliente
+     antiguo con `initialize` y que no se puede abrir ningún flujo, ni con `GET` ni con
+     `subscriptions/listen`.
 5. **El paquete arranca:** la CI construye el zip, lo arranca como lo haría Lambda y comprueba
    el 401 y los metadatos.
+6. **La API real, cada semana.** Las capas anteriores responden con grabaciones, así que
+   seguirían pasando si el BOE cambiara su formato. Seis pruebas preguntan al BOE real, a
+   través de las cuatro herramientas, por hechos publicados que no cambian. Por ejemplo, un
+   boletín pasado tiene 86 disposiciones, y una ley derogada sale como no vigente. No corren
+   en las PR, para que estas no dependan de que el BOE esté disponible: las lanza un workflow
+   los lunes, o `uv run pytest -m live --no-cov` a mano.
 
 Lo que comprueban las herramientas automáticas en cada PR, en GitHub Actions:
 
@@ -742,6 +813,10 @@ Ninguno es un error de sintaxis. Son errores de **dominio** (qué significa «vi
 URLs). Es la clase de error que una revisión encuentra y que las pruebas pensadas para el caso
 normal no.
 
+**El despliegue real** encontró dos fallos más que ni las pruebas ni la revisión podían ver: la
+conexión de 27 segundos y el paquete con código viejo (capítulo 9). Por eso la infraestructura
+se fusiona después de aplicarla, y no antes.
+
 ---
 
 ## 11. Seguridad: amenazas y defensas
@@ -761,8 +836,9 @@ normal no.
 | XML malicioso | `defusedxml` | `boe_client.py` |
 | DNS rebinding | Listas de `Host` y `Origin` permitidos | `http_app.py` |
 | Abuso o factura disparada | Límite de 5/s en API Gateway; presupuesto con aviso | `infra/api.tf`, `infra/budget.tf` |
-| Conexiones abiertas que mantienen Lambda en marcha | `GET` contesta 405; Lambda se corta a los 25 s | `http_app.py`, `infra/api.tf` |
-| Datos personales en los registros | Sin argumentos ni respuestas en los registros | `server.py`, `__main__.py` |
+| Conexiones abiertas que mantienen Lambda en marcha | `GET` contesta 405; no se ofrece `subscriptions/listen`; Lambda se corta a los 25 s | `http_app.py`, `server.py`, `infra/api.tf` |
+| Datos personales en los registros | Sin argumentos ni respuestas en los registros; las IP de las líneas de acceso se borran a los 30 días | `server.py`, `__main__.py`, `infra/api.tf` |
+| Desplegar un código distinto del revisado | El script de empaquetado recompila el proyecto y compara el paquete con `src/` | `scripts/build-lambda.sh` |
 | Permisos de más en AWS | La función solo escribe sus registros | `infra/api.tf` |
 | Secretos en el repositorio | Estado en S3 cifrado; `tfvars` ignorados por git; *secret scanning* de GitHub | `.gitignore`, `infra/bootstrap` |
 
@@ -781,6 +857,11 @@ normal no.
     escribir;
   - y una confirmación de la persona antes de ejecutar, que en la versión 2026-07-28 se pide
     devolviendo un resultado que solicita más información (*input required*).
+- **Solo el texto vigente.** `read_legislation_block` devuelve la redacción vigente y la lista de
+  versiones anteriores, pero no el texto de esas versiones. En la prueba con Claude.ai, el
+  modelo citó de memoria la redacción anterior del artículo 23, aunque avisó de que lo hacía.
+  El BOE da el texto de todas las versiones, así que el siguiente paso sería devolver también
+  la versión que se pida, para que la comparación no dependa de la memoria del modelo.
 - **Sin caché.** Un sumario de un día pasado no cambia. Una caché por instancia de Lambda
   ahorraría peticiones al BOE si el uso creciera.
 - **Un solo tipo de usuario.** En una empresa, Cognito se federaría con el proveedor de
@@ -792,9 +873,9 @@ normal no.
   Esa es la gracia del protocolo.
 - **Con el radar normativo.** El radar es un proceso diario que no necesita que un modelo
   decida a qué API llamar, así que lo natural es que reutilice el **código** del cliente del
-  BOE como biblioteca, no que llame a este servidor. Y un producto de un cliente no debe
-  depender en producción de un servicio de una cuenta personal. Lo decidirá una ADR en la fase
-  de diseño del radar.
+  BOE como biblioteca, no que llame a este servidor. Además, un producto no debería depender en
+  producción de otro servicio con su propio ciclo de vida, sus despliegues y su cuenta. Lo
+  decidirá una ADR en la fase de diseño del radar.
 
 ---
 
@@ -904,9 +985,23 @@ El mismo contenedor ASGI en Cloud Run, que también cobra por uso y escala a cer
 proveedor de identidad compatible con OAuth 2.1 y RFC 8707 como servidor de autorización. El
 código del servidor no cambia; cambian la infraestructura y la configuración.
 
+**¿Qué falló al desplegarlo?**
+Dos cosas que ninguna prueba local podía ver.
+
+1. El servidor anunciaba avisos de cambios, así que Claude Code abría `subscriptions/listen`,
+   un flujo que no se cierra. Lambda esperaba hasta su límite de 25 s en cada conexión. Lo vi
+   en los registros: un 200 seguido de `Status: timeout`. Lo arreglé dejando de ofrecer esa
+   petición, con una prueba que antes fallaba, y la conexión bajó de 27 s a 2 s.
+2. uv no recompila un proyecto local si no cambia su `pyproject.toml`, así que el paquete podía
+   llevar código viejo. Lo delató Terraform al no ver cambios después de un arreglo. Ahora el
+   script fuerza la recompilación y compara el paquete con el código fuente.
+
+Por eso la infraestructura se fusiona después del primer `apply`.
+
 **¿Qué mejorarías primero?**
-Comprobar el inicio de sesión de punta a punta con cada cliente (lo hago al desplegar), añadir
-alarmas sobre errores y una caché de sumarios pasados.
+Que `read_legislation_block` devuelva también el texto de una versión anterior, porque en la
+prueba con Claude.ai el modelo citó de memoria la redacción antigua. Después, alarmas sobre la
+tasa de errores y una caché de sumarios pasados.
 
 ---
 

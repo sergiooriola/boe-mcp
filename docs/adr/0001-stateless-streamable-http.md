@@ -42,10 +42,16 @@ user's own computer.
   `initialize` and with the SDK's own client.
 * Bad, because the server cannot push notifications or stream progress. None of the tools
   needs to.
+* No stream may stay open, because behind the Lambda Web Adapter an open response keeps the
+  function running until its timeout. The server answers `GET` with 405, and
+  `MCPServer(subscriptions=False)` leaves `subscriptions/listen` unserved, so it advertises no
+  `listChanged`. The first deploy showed this was needed: without it, every Claude Code
+  connection waited 25 seconds.
 * The SDK only accepts requests whose `Host` header is in an allowlist (DNS rebinding
   protection), so the public host name is part of the configuration.
 
 ### Confirmation
 
-`tests/test_http_app.py` runs a full MCP session over HTTP with a signed token, and a legacy
-`initialize` request.
+`tests/test_http_app.py` runs a full MCP session over HTTP with a signed token and a legacy
+`initialize` request. It also checks that neither a `GET` stream nor a listen stream can be
+opened.

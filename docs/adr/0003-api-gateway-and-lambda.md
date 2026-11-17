@@ -42,4 +42,5 @@ deployment.
 * Good, because the function has no AWS permission besides writing its own logs.
 * Bad, because API Gateway's 30-second limit bounds every request; the function stops at 25
   seconds and the BOE client at 15, so a slow BOE becomes an error the model can read.
-* Bad, because a cold start adds about a second to the first request after a quiet period.
+* Bad, because a cold start adds about two seconds (1.6 to 2.7 measured) to the first request
+  after a quiet period.

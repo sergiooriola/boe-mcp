@@ -9,30 +9,78 @@ configuration creates a monthly budget of 2 USD that emails at half of it.
 ## 1. An AWS account of its own
 
 Use an account that holds nothing else, so its bill is the server's cost and nothing else can
-reach it.
+reach it. The tested path is a member account of an organization in
+[AWS Organizations](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_introduction.html),
+reached through IAM Identity Center. AWS recommends one account per workload this way.
 
-1. [Create an AWS account](https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-creating.html)
-   on the **Paid plan**. The Free plan closes the account after six months.
-2. [Turn on MFA for the root user](https://docs.aws.amazon.com/IAM/latest/UserGuide/enable-virt-mfa-for-root.html),
-   then stop using it.
-3. Enable the **Europe (Spain)** Region (`eu-south-2`), which is opt-in: account menu >
-   **Account** > **AWS Regions** > Europe (Spain) > **Enable**
-   ([guide](https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-regions.html)).
-4. Create an IAM user for yourself with console access and the `AdministratorAccess` policy,
-   and register an MFA device for it
-   ([guide](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html)). It needs no
-   access keys: the CLI signs in through the console.
+The organization needs three things first:
+
+- IAM Identity Center, with a group that can get the `AdministratorAccess` permission set.
+- Trusted access for AWS Account Management, so the management account can enable Regions in
+  member accounts.
+- [Centralized root access](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-enable-root-access.html),
+  so new member accounts have no root password.
+
+The new account also needs an email address that no other account uses. A group address read
+by more than one person is best.
+
+From the management account (here, the `management` CLI profile):
+
+```sh
+aws organizations create-account --profile management \
+  --email aws-boe-mcp@example.com --account-name example-boe-mcp-prod
+aws organizations describe-create-account-status --profile management \
+  --create-account-request-id <request id from the previous command>
+```
+
+When the status is `SUCCEEDED`, it gives the account id. Then enable **Europe (Spain)**
+(`eu-south-2`), which is opt-in. Wait until the second command says `ENABLED`, which takes a few
+minutes:
+
+```sh
+aws account enable-region --profile management \
+  --account-id <account id> --region-name eu-south-2
+aws account get-region-opt-status --profile management \
+  --account-id <account id> --region-name eu-south-2
+```
+
+Then give your Identity Center group access to the account. `aws sso-admin list-instances`,
+`aws sso-admin list-permission-sets` and `aws identitystore list-groups` give the ARNs and the
+group id:
+
+```sh
+aws sso-admin create-account-assignment --profile management \
+  --instance-arn <instance ARN> --target-type AWS_ACCOUNT --target-id <account id> \
+  --permission-set-arn <AdministratorAccess permission set ARN> \
+  --principal-type GROUP --principal-id <group id>
+```
 
 ## 2. Sign in from the terminal
 
-```sh
-aws configure set region eu-south-2 --profile boe-mcp
-aws login --profile boe-mcp
+Add a profile for the new account to `~/.aws/config`, next to the `sso-session` you already
+use:
+
+```ini
+[profile boe-mcp]
+sso_session = <your sso-session name>
+sso_account_id = <account id>
+sso_role_name = AdministratorAccess
+region = eu-south-2
 ```
 
-[`aws login`](https://docs.aws.amazon.com/cli/latest/reference/login/) opens the browser, takes
-the console sign-in and keeps short-lived credentials that it refreshes. The `Makefile` hands
-them to Terraform with `aws configure export-credentials`.
+```sh
+aws sso login --sso-session <your sso-session name>
+aws sts get-caller-identity --profile boe-mcp
+```
+
+The second command should show the new account. The first minute after the assignment it can
+answer `ForbiddenException: No access`, while Identity Center creates the role.
+
+Add `--use-device-code` to `aws sso login` where the CLI cannot open a browser, as in WSL. It
+prints a URL and a code to type in any browser.
+
+The `Makefile` hands the short-lived credentials to Terraform with
+`aws configure export-credentials`.
 
 ## 3. State bucket, once
 
@@ -76,6 +124,9 @@ aws cognito-idp admin-create-user --profile boe-mcp \
   --desired-delivery-mediums EMAIL
 ```
 
+The email comes from `no-reply@verificationemail.com` and may land in spam. The temporary
+password expires after three days.
+
 ## 6. Connect Claude
 
 **Claude Code**, with the public client and its fixed callback port:
@@ -87,7 +138,9 @@ claude mcp add --transport http --scope user \
   boe "$(terraform -chdir=infra output -raw mcp_url)"
 ```
 
-Then run `/mcp` in Claude Code, choose `boe` and sign in.
+Claude Code reads its MCP servers when a session starts, so open a new session, run `/mcp`,
+choose `boe` and sign in. Where it cannot open a browser, as in WSL, it shows the sign-in URL to
+open by hand.
 
 **Claude.ai**: Settings > Connectors > **Add custom connector**. Enter the `mcp_url` output,
 and under **Advanced settings** choose your own OAuth client with the `claude_ai_client_id`
@@ -97,7 +150,9 @@ output and the secret from `terraform -chdir=infra output -raw claude_ai_client_
 
 Ask Claude something only the BOE knows today, for example: «¿Qué disposiciones generales
 publica hoy el BOE?». The function's log group, `/aws/lambda/boe-mcp`, shows one line per tool
-call with the tool, the outcome and the duration, never the arguments.
+call with the tool, the outcome and the duration, never the arguments. Each request also leaves
+an access line with the caller's IP address, the path and the status, which helps to trace
+abuse and failures. Like the rest of the log, it is deleted after 30 days.
 
 ## Remove everything
 

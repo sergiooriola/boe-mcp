@@ -74,7 +74,9 @@ make build   # Lambda package for arm64 in build/lambda.zip
 ```
 
 Tests run against responses recorded from the live BOE API and never touch the network. The
-OAuth tests sign their own tokens with a throwaway RSA key.
+OAuth tests sign their own tokens with a throwaway RSA key. A few tests ask the live API about
+facts that do not change, to notice when it changes under the recordings. They are skipped by
+default, run with `uv run pytest -m live --no-cov`, and a workflow runs them every Monday.
 
 ## Security
 
@@ -85,8 +87,9 @@ OAuth tests sign their own tokens with a throwaway RSA key.
   `defusedxml`.
 - Requests to any other host name are refused (DNS rebinding protection); API Gateway caps
   traffic at 5 requests per second.
-- The function's only AWS permission is to write its own logs, and logs never contain tool
-  arguments or answers.
+- The function's only AWS permission is to write its own logs. The logs never contain tool
+  arguments or answers. Access lines keep the caller's IP address, and everything is deleted
+  after 30 days.
 
 Report vulnerabilities through [GitHub's private reporting](https://github.com/sergiooriola/boe-mcp/security/advisories/new).
 
