@@ -100,7 +100,7 @@ class OutlineEntry(BaseModel):
     """One block of a rule's text: an article, the preamble, an annex or a provision."""
 
     block_id: str = Field(description="Identifier to pass to read_legislation_block.")
-    title: str
+    title: str = Field(description="Heading of the block; empty when the BOE gives it none.")
     updated: dt.date | None = Field(default=None, description="Last time this block changed.")
 
 

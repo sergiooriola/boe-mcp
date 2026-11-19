@@ -236,11 +236,14 @@ def _law_id_order(law_id: str) -> tuple[int, int]:
 
 
 def parse_outline(data: ET.Element) -> list[OutlineEntry]:
-    """Parse the `data` node of a text index."""
+    """Parse the `data` node of a text index.
+
+    Many rules leave the title of their preamble and signature empty, so a block may have none.
+    """
     return [
         OutlineEntry(
             block_id=_text(block, "id"),
-            title=_text(block, "titulo"),
+            title=_optional_text(block, "titulo") or "",
             updated=_optional_date(block, "fecha_actualizacion"),
         )
         for block in data.iter("bloque")
