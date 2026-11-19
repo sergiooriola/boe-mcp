@@ -260,8 +260,9 @@ limitado y cuesta dinero.
 - La paginación usa `offset` y `next_offset`. Para saber si hay otra página, la búsqueda pide al
   BOE un resultado más de los que devuelve.
 - `get_legislation` devuelve como mucho los 30 cambios más recientes, junto con el total.
-- `get_legislation` devuelve el índice en páginas de 200 bloques, con el total
-  (`outline_total`) y el punto de la página siguiente (`outline_next_offset`). El índice del
+- `get_legislation` devuelve el índice en páginas de 200 bloques, con el total de bloques que
+  pasan el filtro (`outline_total`) y el punto de la página siguiente (`outline_next_offset`),
+  que se pasa como `outline_offset` con el mismo filtro. El índice del
   Código Civil tiene 2.444 bloques, unos 250.000 caracteres, y Claude Code saca a un archivo
   cualquier resultado de más de 50.000. Con páginas de 200, la respuesta más grande medida, la
   de la Ley Orgánica del Poder Judicial, ronda los 33.000.
@@ -880,10 +881,10 @@ que fallaba antes del arreglo:
 - El índice del Código Civil no cabía en la conversación (capítulo 5).
 - Los artículos derogados uno a uno salían como vigentes (capítulo 6).
 
-La causa común: el índice y los artículos grabados para las pruebas eran de una sola norma,
-moderna y pequeña, y unas grabaciones de una norma solo prueban esa norma. Ahora hay
-grabaciones de normas antiguas y grandes, y cada arreglo se midió contra una docena de normas
-reales, de 1862 a 2018.
+La causa común: unas grabaciones solo prueban los casos que contienen. El único índice grabado
+era el de la LO 3/2018, una norma moderna y pequeña, y ningún artículo grabado estaba derogado
+por separado dentro de una norma vigente. Ahora hay grabaciones de normas antiguas y grandes, y
+cada arreglo se midió contra una docena de normas reales, de 1862 a 2018.
 
 ---
 
@@ -931,8 +932,10 @@ reales, de 1862 a 2018.
   El BOE da el texto de todas las versiones, así que el siguiente paso sería devolver también
   la versión que se pida, para que la comparación no dependa de la memoria del modelo.
 - **Una derogación puede adelantarse unas semanas.** Un bloque que solo tiene fecha de
-  caducidad sale como no vigente desde que se publica la norma que lo deroga, que puede ser
-  antes de que la derogación surta efecto. `lapsed_on` da esa fecha para que el modelo lo diga.
+  caducidad sale como no vigente desde esa fecha (`lapsed_on`). El BOE suele ponerla el día en
+  que se publica la norma que lo deroga, pero no dice cuándo surte efecto la derogación, que
+  puede ser más tarde. El servidor no consulta la norma derogatoria: da `lapsed_on` para que el
+  modelo diga de qué fecha se trata.
 - **Sin caché.** Un sumario de un día pasado no cambia. Una caché por instancia de Lambda
   ahorraría peticiones al BOE si el uso creciera.
 - **Un solo tipo de usuario.** En una empresa, Cognito se federaría con el proveedor de
@@ -1074,11 +1077,12 @@ Dos cosas que ninguna prueba local podía ver.
 Por eso la infraestructura se fusiona después del primer `apply`.
 
 **¿Y al usarlo con otras normas?**
-Que unas pruebas grabadas de una sola norma solo prueban esa norma. Al preguntar por el Código
-Civil aparecieron cinco fallos: el BOE deja vacíos títulos que la LO 3/2018 rellena, usa
-identificadores de bloque con puntos y paréntesis, ignora un rango de fechas con un solo
-extremo aunque su guía diga lo contrario y marca los artículos derogados de dos formas
-distintas. Además, el índice del Código no cabía en la conversación. Lo corregí en cinco PR
+Que unas grabaciones solo prueban los casos que contienen, y el único índice grabado era el de
+la LO 3/2018. Al preguntar por el Código Civil aparecieron cinco fallos: el BOE deja vacíos
+títulos que la LO 3/2018 rellena, usa identificadores de bloque con puntos y paréntesis, ignora
+un rango de fechas con un solo extremo aunque su guía diga lo contrario y marca los artículos
+derogados de dos formas distintas, y el índice del Código no cabía en la conversación. Lo
+corregí en cinco PR
 pequeñas, cada una con una prueba que fallaba antes, y medí los arreglos contra una docena de
 normas reales, de 1862 a 2018.
 
