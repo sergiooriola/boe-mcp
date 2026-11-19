@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<response>
+  <status>
+    <code>200</code>
+    <text>ok</text>
+  </status>
+  <data>
+    <bloque id="a387" tipo="precepto" titulo="Artículo 387">
+      <version id_norma="BOE-A-1882-6036" fecha_publicacion="19970601" fecha_vigencia="19970601">
+        <p class="articulo">Artículo 387.</p>
+        <p class="parrafo">No se exigirá juramento a los procesados, exhortándoles solamente a decir verdad y advirtiéndoles el Juez de instrucción que deben responder de una manera precisa, clara y conforme a la verdad a las preguntas que les fueren hechas.</p>
+      </version>
+      <version id_norma="BOE-A-2015-10725" fecha_publicacion="20151006" fecha_vigencia="20151206">
+        <p class="articulo">Artículo 387.</p>
+        <p class="parrafo"><strong>(Derogado)</strong>.</p>
+        <blockquote class="noDesde20151206">
+          <p class="parrafo">Téngase en cuenta que este artículo se deroga por la disposición derogatoria única de la Ley Orgánica 13/2015, de 5 de octubre. <a class="refPost">Ref. BOE-A-2015-10725</a>. con efectos de 6 de diciembre de 2015, según establece la disposición final 4 de la citada ley orgánica.</p>
+          <p class="cita_con_pleca">Redacción anterior:</p>
+          <p class="parrafo">"No se exigirá juramento a los procesados, exhortándoles solamente a decir verdad y advirtiéndoles el Juez de instrucción que deben responder de una manera precisa, clara y conforme a la verdad a las preguntas que les fueren hechas."</p>
+        </blockquote>
+        <blockquote>
+          <p class="nota_pie">Se deroga por la disposición derogatoria única de la Ley Orgánica 13/2015, de 5 de octubre. <a class="refPost">Ref. BOE-A-2015-10725</a>.</p>
+        </blockquote>
+      </version>
+    </bloque>
+  </data>
+</response>

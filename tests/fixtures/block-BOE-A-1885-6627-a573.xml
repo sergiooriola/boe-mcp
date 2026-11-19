@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<response>
+  <status>
+    <code>200</code>
+    <text>ok</text>
+  </status>
+  <data>
+    <bloque id="a573" tipo="precepto" fecha_caducidad="20140725" titulo="Art 573">
+      <version id_norma="BOE-A-1885-6627" fecha_publicacion="19961101" fecha_vigencia="19961101">
+        <p class="articulo">Art. 573.</p>
+        <p class="parrafo">Los buques mercantes constituirán una propiedad que se podrá adquirir y transmitir por cualquiera de los medios reconocidos en el Derecho. La adquisición de un buque deberá constar en documento escrito, el cual no producirá efecto respecto a tercero si no se inscribe en el Registro Mercantil.</p>
+        <p class="parrafo">También se adquirirá la propiedad de un buque por la posesión de buena fe, continuada por tres años, con justo título debidamente registrado.</p>
+        <p class="parrafo">Faltando alguno de estos requisitos, se necesitará la posesión continuada de diez años para adquirir la propiedad.</p>
+        <p class="parrafo">El capitán no podrá adquirir por prescripción el buque que mande.</p>
+      </version>
+    </bloque>
+  </data>
+</response>

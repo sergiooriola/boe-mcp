@@ -159,6 +159,10 @@ class BlockVersion(BaseModel):
     )
     published: dt.date
     in_force_from: dt.date | None = None
+    repealed: bool = Field(
+        description="True when this version only says that the block was repealed, suppressed, "
+        "annulled or left without content, such as '(Derogado)'."
+    )
 
 
 class LegislationBlock(BaseModel):
@@ -170,8 +174,15 @@ class LegislationBlock(BaseModel):
     kind: str = Field(description="precepto, preambulo, parte_final, firma, nota_inicial…")
     title: str
     in_force: bool = Field(
-        description="True only when the rule is in force and `text` has taken effect. A "
-        "repealed rule keeps its last wording, which is no longer in force."
+        description="True only when the rule is in force, `text` has taken effect and the block "
+        "has not been repealed. A repealed rule or block keeps its last wording, which is no "
+        "longer in force."
+    )
+    lapsed_on: dt.date | None = Field(
+        default=None,
+        description="Date from which the BOE no longer shows this block in the consolidated "
+        "text, as it does when a later rule repeals it. It is usually that rule's publication "
+        "date, so the repeal itself can take effect later.",
     )
     current_version: BlockVersion | None = Field(
         description="Latest version that has taken effect; null when the block only has "

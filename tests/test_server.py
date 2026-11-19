@@ -210,6 +210,56 @@ async def test_a_repealed_rule_keeps_its_wording_but_it_is_not_in_force(client: 
 
 
 @pytest.mark.anyio
+async def test_a_repealed_article_of_a_rule_in_force_is_not_in_force(client: Client) -> None:
+    # Ley Orgánica 13/2015 repealed article 387 of the Ley de Enjuiciamiento Criminal.
+    block = await _call(client, "read_legislation_block", law_id="BOE-A-1882-6036", block_id="a387")
+
+    assert block["law_status"] == "in_force"
+    assert block["in_force"] is False
+    assert block["current_version"]["repealed"] is True
+    assert block["previous_versions"][0]["repealed"] is False
+    assert "(Derogado)" in block["text"]
+
+
+@pytest.mark.anyio
+async def test_a_lapsed_article_is_not_in_force_although_it_keeps_its_wording(
+    client: Client,
+) -> None:
+    # Ley 14/2014 repealed the maritime articles of the Código de Comercio; the BOE only marks
+    # the blocks as lapsed, without a version that says so.
+    block = await _call(client, "read_legislation_block", law_id="BOE-A-1885-6627", block_id="a573")
+
+    assert block["in_force"] is False
+    assert block["lapsed_on"] == "2014-07-25"
+    assert block["current_version"]["repealed"] is False
+    assert block["text"].startswith("Art. 573.")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("today", "in_force"), [(dt.date(2021, 7, 1), True), (TODAY, False)])
+async def test_an_article_holds_until_its_repeal_takes_effect(
+    fake_boe: FakeBoe, today: dt.date, in_force: bool
+) -> None:
+    # Ley 8/2021, published on 2021-06-03, repealed article 301 of the Código Civil from
+    # 2021-09-03. The BOE marks the block as lapsed from the publication date.
+    server = create_server(http_client=fake_boe.client, today=lambda: today)
+    async with Client(server, raise_exceptions=True) as client:
+        block = await _call(
+            client, "read_legislation_block", law_id="BOE-A-1889-4763", block_id="art301"
+        )
+
+    assert block["lapsed_on"] == "2021-06-03"
+    assert block["in_force"] is in_force
+    repeal = block["current_version"] if not in_force else block["upcoming_versions"][0]
+    assert repeal == {
+        "introduced_by": "BOE-A-2021-9233",
+        "published": "2021-06-03",
+        "in_force_from": "2021-09-03",
+        "repealed": True,
+    }
+
+
+@pytest.mark.anyio
 async def test_search_words_never_reach_the_logs(
     client: Client, caplog: pytest.LogCaptureFixture
 ) -> None:

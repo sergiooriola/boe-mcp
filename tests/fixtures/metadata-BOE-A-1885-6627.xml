@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<response>
+  <status>
+    <code>200</code>
+    <text>ok</text>
+  </status>
+  <data>
+    <metadatos>
+      <fecha_actualizacion>20251216T102453Z</fecha_actualizacion>
+      <identificador>BOE-A-1885-6627</identificador>
+      <ambito codigo="1">Estatal</ambito>
+      <departamento codigo="4835">Ministerio de Gracia y Justicia</departamento>
+      <rango codigo="1340">Real Decreto</rango>
+      <fecha_disposicion>18850822</fecha_disposicion>
+      <titulo>Real Decreto de 22 de agosto de 1885 por el que se publica el Código de Comercio.</titulo>
+      <diario>Gaceta de Madrid</diario>
+      <fecha_publicacion>18851016</fecha_publicacion>
+      <diario_numero>289</diario_numero>
+      <fecha_vigencia>18860101</fecha_vigencia>
+      <estatus_derogacion>N</estatus_derogacion>
+      <estatus_anulacion>N</estatus_anulacion>
+      <vigencia_agotada>N</vigencia_agotada>
+      <estado_consolidacion codigo="3">Finalizado</estado_consolidacion>
+      <url_eli>https://www.boe.es/eli/es/rd/1885/08/22/(1)</url_eli>
+      <url_html_consolidada>https://www.boe.es/buscar/act.php?id=BOE-A-1885-6627</url_html_consolidada>
+    </metadatos>
+  </data>
+</response>

@@ -20,6 +20,18 @@ ROUTES = {
     "legislacion-consolidada": "search-proteccion-datos.xml",
     "legislacion-consolidada/id/BOE-A-2018-16673/metadatos": "metadata-BOE-A-2018-16673.xml",
     "legislacion-consolidada/id/BOE-A-1992-26318/metadatos": "metadata-BOE-A-1992-26318.xml",
+    "legislacion-consolidada/id/BOE-A-1882-6036/metadatos": "metadata-BOE-A-1882-6036.xml",
+    "legislacion-consolidada/id/BOE-A-1885-6627/metadatos": "metadata-BOE-A-1885-6627.xml",
+    "legislacion-consolidada/id/BOE-A-1889-4763/metadatos": "metadata-BOE-A-1889-4763.xml",
+    "legislacion-consolidada/id/BOE-A-1882-6036/texto/bloque/a387": (
+        "block-BOE-A-1882-6036-a387.xml"
+    ),
+    "legislacion-consolidada/id/BOE-A-1885-6627/texto/bloque/a573": (
+        "block-BOE-A-1885-6627-a573.xml"
+    ),
+    "legislacion-consolidada/id/BOE-A-1889-4763/texto/bloque/art301": (
+        "block-BOE-A-1889-4763-art301.xml"
+    ),
     "legislacion-consolidada/id/BOE-A-1992-26318/texto/bloque/a1": "block-BOE-A-1992-26318-a1.xml",
     "legislacion-consolidada/id/BOE-A-2018-16673/analisis": "analysis-BOE-A-2018-16673.xml",
     "legislacion-consolidada/id/BOE-A-2018-16673/texto/indice": "outline-BOE-A-2018-16673.xml",

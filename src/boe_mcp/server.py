@@ -322,6 +322,14 @@ def create_server(
             key=lambda entry: entry[0].in_force_from or entry[0].published,
         )
         current, wording = started[-1] if started else (None, "")
+        # The BOE stops showing a block when the rule that repeals it is published, which can be
+        # before the repeal takes effect: while that repeal is upcoming, the block still holds.
+        lapsed = (
+            block.lapsed_on is not None
+            and block.lapsed_on <= today
+            and not any(version.repealed for version, _ in upcoming)
+        )
+        block_in_force = current is not None and not current.repealed and not lapsed
         text, text_cut = parsing.truncate(wording)
         upcoming_text, upcoming_cut = (
             parsing.truncate(upcoming[0][1]) if upcoming else (None, False)
@@ -332,7 +340,8 @@ def create_server(
             block_id=block_id,
             kind=block.kind,
             title=block.title,
-            in_force=current is not None and law_status in IN_FORCE_STATUSES,
+            in_force=block_in_force and law_status in IN_FORCE_STATUSES,
+            lapsed_on=block.lapsed_on,
             current_version=current,
             text=text,
             upcoming_versions=[version for version, _ in upcoming],

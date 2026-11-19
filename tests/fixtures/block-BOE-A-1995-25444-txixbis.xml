@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<response>
+  <status>
+    <code>200</code>
+    <text>ok</text>
+  </status>
+  <data>
+    <bloque id="txixbis" tipo="precepto" fecha_caducidad="20031126" titulo="TÍTULO XIX bis">
+      <version id_norma="BOE-A-2000-543" fecha_publicacion="20000112" fecha_vigencia="20000201">
+        <p class="titulo_num">TÍTULO XIX bis</p>
+        <p class="titulo_tit">De los delitos de corrupción en las transacciones comerciales internacionales</p>
+        <blockquote>
+          <p class="nota_pie">Se añade por el art. único de la Ley Orgánica 3/2000, de 11 de enero. <a class="refPost">Ref. BOE-A-2000-543</a></p>
+        </blockquote>
+      </version>
+      <version id_norma="BOE-A-2003-21538" fecha_publicacion="20031126" fecha_vigencia="20041001">
+        <p class="titulo_num">TÍTULO XIX bis</p>
+        <p class="titulo_tit">De los delitos de corrupción en las transacciones comerciales internacionales</p>
+        <p class="centro_negrita">(Suprimido)</p>
+        <blockquote>
+          <p class="nota_pie">Se interpreta su supresión al integrarse su contenido en el capítulo X del título XIX del libro II, añadido por la Ley Orgánica 15/2003, de 25 de noviembre.</p>
+          <p class="nota_pie">Se añade por el art. único de la Ley Orgánica 3/2000, de 11 de enero. <a class="refPost">Ref. BOE-A-2000-543</a></p>
+        </blockquote>
+      </version>
+    </bloque>
+  </data>
+</response>

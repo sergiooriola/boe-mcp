@@ -138,6 +138,59 @@ def test_block_keeps_every_version_oldest_first_with_notes() -> None:
     assert "Nota: " in current_text
 
 
+@pytest.mark.parametrize(
+    "fixture",
+    [
+        "block-BOE-A-1882-6036-a387.xml",  # "(Derogado)." on a line of its own
+        "block-BOE-A-1889-4763-art.1863bis.xml",  # "Artículo 1863 bis. (Derogado)"
+        "block-BOE-A-1995-25444-txixbis.xml",  # a title, its name and "(Suprimido)"
+    ],
+)
+def test_only_the_version_that_repeals_a_block_is_a_repeal_notice(fixture: str) -> None:
+    block = parsing.parse_block(fixture_data(fixture))
+
+    assert [version.repealed for version, _ in block.versions] == [False] * (
+        len(block.versions) - 1
+    ) + [True]
+
+
+@pytest.mark.parametrize(
+    "version",
+    [
+        "<version><p>Artículo 1654.</p><p>Queda suprimido el contrato de subenfiteusis.</p>"
+        "</version>",
+        "<version><p>Artículo 12. Se aplica el régimen del artículo 5 de la Ley 30/1992, de 26 de "
+        "noviembre, y de su reglamento (derogado).</p></version>",
+        "<version><p>Artículo 9.</p><p>1. Texto.</p><p>2. Texto.</p><p>(Derogado)</p></version>",
+        "<version><blockquote><p>(Derogado)</p></blockquote></version>",
+    ],
+)
+def test_wording_that_mentions_a_repeal_is_not_a_repeal_notice(version: str) -> None:
+    assert parsing.is_repeal_notice(ET.fromstring(version)) is False
+
+
+@pytest.mark.parametrize(
+    ("fixture", "lapsed_on"),
+    [
+        ("block-BOE-A-1885-6627-a573.xml", dt.date(2014, 7, 25)),
+        ("block-BOE-A-2018-16673-a2-5.xml", None),
+    ],
+)
+def test_block_lapse_date(fixture: str, lapsed_on: dt.date | None) -> None:
+    assert parsing.parse_block(fixture_data(fixture)).lapsed_on == lapsed_on
+
+
+def test_an_impossible_lapse_date_is_ignored() -> None:
+    # The BOE has a few, such as 00000015 on article 309 of the Código Civil.
+    data = ET.fromstring(
+        '<data><bloque id="a1" tipo="precepto" titulo="Artículo 1" fecha_caducidad="00000015">'
+        '<version id_norma="BOE-A-1889-4763" fecha_publicacion="18890725"><p>Artículo 1.</p>'
+        "</version></bloque></data>"
+    )
+
+    assert parsing.parse_block(data).lapsed_on is None
+
+
 def test_block_without_versions_is_rejected() -> None:
     data = ET.fromstring('<data><bloque id="a1" tipo="precepto" titulo="Artículo 1"/></data>')
 
