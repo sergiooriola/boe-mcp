@@ -262,10 +262,10 @@ limitado y cuesta dinero.
 - `get_legislation` devuelve como mucho los 30 cambios más recientes, junto con el total.
 - `get_legislation` devuelve el índice en páginas de 200 bloques, con el total de bloques que
   pasan el filtro (`outline_total`) y el punto de la página siguiente (`outline_next_offset`),
-  que se pasa como `outline_offset` con el mismo filtro. El índice del
-  Código Civil tiene 2.444 bloques, unos 250.000 caracteres, y Claude Code saca a un archivo
-  cualquier resultado de más de 50.000. Con páginas de 200, la respuesta más grande medida, la
-  de la Ley Orgánica del Poder Judicial, ronda los 33.000.
+  que se pasa como `outline_offset` con el mismo filtro y que es `null` en la última página. El
+  índice del Código Civil tiene 2.444 bloques, unos 250.000 caracteres, y Claude Code saca a un
+  archivo cualquier resultado de más de 50.000. Con páginas de 200, la respuesta más grande
+  medida, la de la Ley Orgánica del Poder Judicial, ronda los 33.000.
 - `outline_contains` deja solo los bloques cuyo título tiene todas las palabras dadas, como
   palabras enteras y sin distinguir mayúsculas ni tildes: `23` encuentra «Artículo 23», pero no
   «Artículo 123» ni «Artículo 230». Los títulos no numeran los apartados, así que para el
