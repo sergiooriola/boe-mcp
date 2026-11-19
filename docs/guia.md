@@ -39,15 +39,17 @@ Un ejemplo de uso real. Le preguntas a Claude:
 
 > ¿Ha cambiado algo en el artículo 23 de la ley de protección de datos?
 
-Claude no responde de memoria. Usa cuatro herramientas del servidor, una detrás de otra:
+Claude no responde de memoria. Usa tres de las cuatro herramientas del servidor, una detrás de
+otra:
 
 1. `search_legislation` con `official_number: "3/2018"` encuentra la Ley Orgánica 3/2018 y su
-   identificador, `BOE-A-2018-16673`.
-2. `get_legislation` devuelve que está en vigor, su índice (169 bloques: artículos,
-   disposiciones…) y las normas que la han modificado. La más reciente es `BOE-A-2025-26698`,
-   la Ley 10/2025, que «modifica el art. 23».
-3. En el índice, el «Artículo 23» es el bloque `a2-5`.
-4. `read_legislation_block` devuelve el texto de ese artículo, confirma que está en vigor
+   identificador, `BOE-A-2018-16673`. Hay otras normas con ese número, como una ley gallega y
+   otra canaria, así que el modelo elige por el título.
+2. `get_legislation` con `outline_contains: "23"` devuelve que está en vigor y las normas que la
+   han modificado. La más reciente es `BOE-A-2025-26698`, la Ley 10/2025, que «modifica el art.
+   23». De los 169 bloques de su índice (artículos, disposiciones…), devuelve solo el que se
+   titula «Artículo 23»: el bloque `a2-5`.
+3. `read_legislation_block` devuelve el texto de ese artículo, confirma que está en vigor
    (`in_force: true`) y da su historia: la redacción original de 2018 y la actual, en vigor
    desde el 28 de diciembre de 2025.
 
@@ -186,12 +188,16 @@ no añadirían nada hoy.
 
 Un **SDK** (*software development kit*) es una biblioteca que implementa el protocolo para que
 no haya que escribirlo a mano. El proyecto usa el **SDK oficial de Python, `mcp` 2.3.0**, con
-su clase `MCPServer`. Cada herramienta es una función de Python con un decorador:
+su clase `MCPServer`. Cada herramienta es una función de Python con un decorador. Esta es la
+firma de `get_legislation`, sin las descripciones de cada parámetro:
 
 ```python
 @server.tool(title="Rule status, outline and changes", annotations=READ_ONLY)
 async def get_legislation(
-    ctx: ToolContext, law_id: Annotated[str, Field(max_length=40)]
+    ctx: ToolContext,
+    law_id: Annotated[str, Field(max_length=40)],
+    outline_contains: Annotated[str | None, Field(max_length=200)] = None,
+    outline_offset: Annotated[int, Field(ge=0)] = 0,
 ) -> Legislation:
     """Describe one consolidated rule: its status today, its outline and its later changes."""
 ```
@@ -210,7 +216,7 @@ tipos de los parámetros) y el de salida (el tipo de retorno, un modelo de Pydan
 | --- | --- | --- |
 | `get_daily_summary` | Lo publicado un día (hoy por defecto), filtrable por sección y por palabras del título | 1 |
 | `search_legislation` | Busca normas consolidadas por título, texto o número oficial | 1 |
-| `get_legislation` | Estado de una norma hoy, su índice y las normas que la han cambiado | 3, en paralelo |
+| `get_legislation` | Estado de una norma hoy, su índice (por páginas y filtrable por palabras de los títulos) y las normas que la han cambiado | 3, en paralelo |
 | `read_legislation_block` | Última redacción de un bloque (un artículo, el preámbulo, un anexo), si está en vigor, la aprobada para más adelante y su historia | 2, en paralelo |
 
 El código está en [`src/boe_mcp/server.py`](../src/boe_mcp/server.py). Estos son los principios
@@ -223,7 +229,8 @@ las tres cosas a la vez.
 
 **La descripción es el manual que lee el modelo.** Dice qué hace la herramienta, cuándo usarla y
 cómo encadenarla. Además, el servidor envía unas **instrucciones** generales (`INSTRUCTIONS`)
-con el recorrido típico: buscar, después pedir el índice y después leer el bloque.
+con el recorrido típico: buscar la norma, después buscar el artículo en su índice con
+`outline_contains` y después leer el bloque.
 
 **El esquema de entrada pone límites.** Los tipos de Python se convierten en JSON Schema:
 
@@ -253,6 +260,16 @@ limitado y cuesta dinero.
 - La paginación usa `offset` y `next_offset`. Para saber si hay otra página, la búsqueda pide al
   BOE un resultado más de los que devuelve.
 - `get_legislation` devuelve como mucho los 30 cambios más recientes, junto con el total.
+- `get_legislation` devuelve el índice en páginas de 200 bloques, con el total de bloques que
+  pasan el filtro (`outline_total`) y el punto de la página siguiente (`outline_next_offset`),
+  que se pasa como `outline_offset` con el mismo filtro y que es `null` en la última página. El
+  índice del Código Civil tiene 2.444 bloques, unos 250.000 caracteres, y Claude Code saca a un
+  archivo cualquier resultado de más de 50.000. Con páginas de 200, la respuesta más grande
+  medida, la de la Ley Orgánica del Poder Judicial, ronda los 33.000.
+- `outline_contains` deja solo los bloques cuyo título tiene todas las palabras dadas, como
+  palabras enteras y sin distinguir mayúsculas ni tildes: `23` encuentra «Artículo 23», pero no
+  «Artículo 123» ni «Artículo 230». Los títulos no numeran los apartados, así que para el
+  artículo 23.1 hay que dar `23`, y la descripción del parámetro lo dice.
 - `read_legislation_block` corta los textos de más de 20.000 caracteres por el final de un
   párrafo y lo indica con `truncated: true`.
 
@@ -265,8 +282,8 @@ limitado y cuesta dinero.
   - una fecha en domingo: «There is no BOE for 2026-10-11: the BOE is not published on
     Sundays…»;
   - un identificador mal formado: «BOE identifiers look like BOE-A-2018-16673»;
-  - un bloque que no existe: «Call get_legislation for the outline and use one of its block_id
-    values».
+  - un bloque que no existe: «Call get_legislation for the outline, with outline_contains set
+    to the article number, and use one of its block_id values».
 
 **El modelo no sabe qué día es.** Por eso `get_daily_summary` usa por defecto la fecha de hoy
 en la hora de Madrid, que es la del calendario del BOE.
@@ -309,6 +326,32 @@ salen varias decisiones:
 - **Las relaciones se leen por su código y su identificador,** nunca por el texto libre, que el
   BOE escribe a mano.
 
+El uso con normas antiguas y grandes, como el Código Civil, enseñó tres cosas más (capítulo 10):
+
+- **Un bloque puede no tener título.** El BOE deja vacío el título del preámbulo y de la firma
+  en muchas normas. La LO 3/2018, que era la del índice grabado en las pruebas, los titula
+  «[preambulo]» y «[firma]», así que el índice de casi todas las demás fallaba. Ahora un
+  bloque sin título tiene un título vacío, y el esquema de salida avisa al modelo de que puede
+  estarlo.
+- **Un artículo también se deroga solo, y el BOE lo marca de dos formas distintas.**
+  - Con un **aviso**: una versión nueva que solo tiene el título del bloque y «(Derogado)»,
+    «(Suprimido)», «(Anulado)» o «(Sin contenido)». Sus fechas dicen cuándo surte efecto la
+    derogación. El artículo 387 de la Ley de Enjuiciamiento Criminal solo tiene esta marca.
+  - Con `fecha_caducidad`, la fecha desde la que el BOE deja de mostrar el bloque, que suele
+    ser la de publicación de la norma que lo deroga. Los artículos marítimos del Código de
+    Comercio, derogados en 2014, solo tienen esta marca y conservan su texto completo.
+
+  `read_legislation_block` marca `in_force: false` en los dos casos y lo explica con
+  `repealed` en cada versión y `lapsed_on` en el bloque. La fecha de caducidad no cuenta
+  mientras el aviso de derogación aún no haya entrado en vigor: el artículo 301 del Código
+  Civil caducó el 3 de junio de 2021, pero su derogación surtió efecto el 3 de septiembre.
+  Antes del arreglo, 1.033 de 9.655 bloques de 12 normas salían como vigentes sin estarlo.
+- **La documentación del BOE no siempre coincide con su API.** Su guía dice que un rango de
+  fechas puede tener un solo extremo, pero la API ignora un rango así: «Código Civil» publicado
+  hasta 1890 devolvía normas de 2003 a 2024. Por eso la búsqueda envía siempre los dos extremos
+  y rellena el que falta con la primera o la última fecha posible. Una prueba contra el BOE
+  real lo vigila.
+
 **Condiciones de reutilización.** El BOE permite reutilizar sus datos con condiciones:
 
 - citar la fuente con un enlace;
@@ -326,8 +369,11 @@ Tres defensas, en [`src/boe_mcp/boe_client.py`](../src/boe_mcp/boe_client.py):
 1. **Identificadores validados antes de construir la URL.** `law_id` va dentro de la ruta de la
    URL. Sin validarlo, un argumento como `../../robots.txt` haría que el servidor pidiera otra
    ruta del BOE. Una expresión regular solo admite identificadores con la forma
-   `BOE-A-2018-16673` y bloques con la forma `a2-5`, y lo demás se rechaza sin hacer ninguna
-   petición. Hay pruebas para eso.
+   `BOE-A-2018-16673`. Para los bloques admite letras, cifras, guiones, puntos y paréntesis de
+   cierre, hasta 80 caracteres, que son los únicos que aparecen en los índices del BOE: `a2-5`,
+   `art.1863bis` o `a846bisa)`. Un bloque necesita además una letra o una cifra, porque `.` o
+   `..` solos subirían en la ruta. Lo demás se rechaza sin hacer ninguna petición. Hay pruebas
+   para eso.
 2. **Búsqueda sin inyección.** La búsqueda del BOE tiene su propio lenguaje, con pares
    `campo:valor` unidos por `and`, `or` y `not`. Si el servidor pegara tal cual lo que escribe
    el modelo, este podría alterar la consulta. Por eso la entrada se corta en palabras, se
@@ -752,14 +798,16 @@ El razonamiento completo está en la [ADR 0003](adr/0003-api-gateway-and-lambda.
 depender de probar a mano.
 **Se apoya en:** todos los anteriores.
 
-Las pruebas (83, con un 99 % de cobertura, más seis contra el BOE real) van por capas, de la
+Las pruebas (114, con un 99 % de cobertura, más 12 contra el BOE real) van por capas, de la
 más aislada a la más completa:
 
 1. **Análisis del XML** con respuestas reales grabadas del BOE en noviembre de 2026:
    - un día con número extraordinario;
    - un artículo modificado, con sus notas;
    - una norma con derogación futura;
-   - una norma derogada.
+   - una norma derogada;
+   - el índice de la Constitución, con bloques sin título;
+   - artículos derogados uno a uno, con aviso de derogación o solo con fecha de caducidad.
 2. **Cliente HTTP:** cada fallo del BOE (404, 5xx, tiempo agotado, red caída, XML roto) se
    convierte en el error adecuado; los identificadores maliciosos se rechazan sin llegar a hacer
    ninguna petición; la búsqueda no admite inyección.
@@ -775,9 +823,10 @@ más aislada a la más completa:
 5. **El paquete arranca:** la CI construye el zip, lo arranca como lo haría Lambda y comprueba
    el 401 y los metadatos.
 6. **La API real, cada semana.** Las capas anteriores responden con grabaciones, así que
-   seguirían pasando si el BOE cambiara su formato. Seis pruebas preguntan al BOE real, a
+   seguirían pasando si el BOE cambiara su formato. Doce pruebas preguntan al BOE real, a
    través de las cuatro herramientas, por hechos publicados que no cambian. Por ejemplo, un
-   boletín pasado tiene 86 disposiciones, y una ley derogada sale como no vigente. No corren
+   boletín pasado tiene 86 disposiciones, una ley derogada sale como no vigente y el artículo
+   1172 del Código Civil se encuentra por su número en un índice de 2.444 bloques. No corren
    en las PR, para que estas no dependan de que el BOE esté disponible: las lanza un workflow
    los lunes, o `uv run pytest -m live --no-cov` a mano.
 
@@ -806,7 +855,10 @@ prueba:
 - un `GET` abría un flujo que dejaba Lambda en marcha hasta agotar su tiempo;
 - Cognito habría rechazado el cliente de Claude Code, porque no admite la rotación del token de
   refresco junto con el flujo `REFRESH_TOKEN_AUTH`;
-- si fallaban las credenciales de AWS, el `Makefile` seguía y Terraform podía usar otras.
+- si fallaban las credenciales de AWS, el `Makefile` seguía y Terraform podía usar otras;
+- un modelo que buscara `23.1` en el índice no encontraba nada, porque los títulos no numeran
+  los apartados;
+- una línea de texto normativo podía pasar por el título de un aviso de derogación.
 
 Ninguno es un error de sintaxis. Son errores de **dominio** (qué significa «vigente»), de
 **privacidad** o de cómo se comporta el servidor **en su entorno real** (Lambda, navegadores,
@@ -816,6 +868,23 @@ normal no.
 **El despliegue real** encontró dos fallos más que ni las pruebas ni la revisión podían ver: la
 conexión de 27 segundos y el paquete con código viejo (capítulo 9). Por eso la infraestructura
 se fusiona después de aplicarla, y no antes.
+
+**El uso con otras normas** encontró cinco fallos más el 19 de noviembre de 2026, al preguntar
+por el Código Civil. Se corrigieron en cinco PR pequeñas (#11 a #15), cada una con una prueba
+que fallaba antes del arreglo:
+
+- `get_legislation` fallaba en casi todas las normas, porque el BOE deja vacíos títulos que la
+  LO 3/2018 rellena (capítulo 6). De 14 normas probadas, solo funcionaba esa.
+- `read_legislation_block` rechazaba identificadores de bloque reales, como `art.1863bis` o
+  `a846bisa)` (capítulo 6).
+- La búsqueda ignoraba un rango de fechas con un solo extremo (capítulo 6).
+- El índice del Código Civil no cabía en la conversación (capítulo 5).
+- Los artículos derogados uno a uno salían como vigentes (capítulo 6).
+
+La causa común: unas grabaciones solo prueban los casos que contienen. El único índice grabado
+era el de la LO 3/2018, una norma moderna y pequeña, y ningún artículo grabado estaba derogado
+por separado dentro de una norma vigente. Ahora hay grabaciones de normas antiguas y grandes, y
+cada arreglo se midió contra una docena de normas reales, de 1862 a 2018.
 
 ---
 
@@ -862,6 +931,11 @@ se fusiona después de aplicarla, y no antes.
   modelo citó de memoria la redacción anterior del artículo 23, aunque avisó de que lo hacía.
   El BOE da el texto de todas las versiones, así que el siguiente paso sería devolver también
   la versión que se pida, para que la comparación no dependa de la memoria del modelo.
+- **Una derogación puede adelantarse unas semanas.** Un bloque que solo tiene fecha de
+  caducidad sale como no vigente desde esa fecha (`lapsed_on`). El BOE suele ponerla el día en
+  que se publica la norma que lo deroga, pero no dice cuándo surte efecto la derogación, que
+  puede ser más tarde. El servidor no consulta la norma derogatoria: da `lapsed_on` para que el
+  modelo diga de qué fecha se trata.
 - **Sin caché.** Un sumario de un día pasado no cambia. Una caché por instancia de Lambda
   ahorraría peticiones al BOE si el uso creciera.
 - **Un solo tipo de usuario.** En una empresa, Cognito se federaría con el proveedor de
@@ -901,7 +975,10 @@ Porque el modelo elige mejor entre pocas herramientas que cubren tareas completa
 **¿Cómo evitas que la respuesta llene el contexto del modelo?**
 Con paginación (`offset`, `next_offset` y un resultado de más para saber si hay otra página),
 con recuentos por sección para que el modelo vea qué hay sin pedirlo todo, con un tope de 30
-cambios y con el truncado del texto a 20.000 caracteres por el final de un párrafo.
+cambios y con el truncado del texto a 20.000 caracteres por el final de un párrafo. El índice
+de una norma va en páginas de 200 bloques y se filtra por palabras de los títulos, porque el
+del Código Civil, con 2.444 bloques, ocupa unos 250.000 caracteres: cinco veces lo que Claude
+Code deja en la conversación.
 
 **¿Qué diferencia hay entre un error de protocolo y uno de herramienta?**
 El de protocolo (herramienta inexistente, JSON mal formado) es un error JSON-RPC y lo gestiona
@@ -962,7 +1039,8 @@ Gateway limita el ritmo de peticiones antes de llegar al código.
 
 **¿Por qué Lambda y no un contenedor?**
 Unos cientos de peticiones al mes: Lambda cuesta céntimos y nada cuando no se usa, y Fargate se
-paga por hora encendida. El precio es el arranque en frío, de alrededor de un segundo.
+paga por hora encendida. El precio es el arranque en frío: unos dos segundos más en la primera
+petición tras un rato sin uso (entre 1,6 y 2,7 s, medidos en el despliegue).
 
 **¿Por qué no Bedrock AgentCore?**
 Es el servicio gestionado de AWS para alojar agentes y servidores MCP, y sería mi candidato en
@@ -997,6 +1075,15 @@ Dos cosas que ninguna prueba local podía ver.
    script fuerza la recompilación y compara el paquete con el código fuente.
 
 Por eso la infraestructura se fusiona después del primer `apply`.
+
+**¿Y al usarlo con otras normas?**
+Que unas grabaciones solo prueban los casos que contienen, y el único índice grabado era el de
+la LO 3/2018. Al preguntar por el Código Civil aparecieron cinco fallos: el BOE deja vacíos
+títulos que la LO 3/2018 rellena, usa identificadores de bloque con puntos y paréntesis, ignora
+un rango de fechas con un solo extremo aunque su guía diga lo contrario y marca los artículos
+derogados de dos formas distintas, y el índice del Código no cabía en la conversación. Lo
+corregí en cinco PR pequeñas, cada una con una prueba que fallaba antes, y medí los arreglos
+contra una docena de normas reales, de 1862 a 2018.
 
 **¿Qué mejorarías primero?**
 Que `read_legislation_block` devuelva también el texto de una versión anterior, porque en la
