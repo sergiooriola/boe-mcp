@@ -115,6 +115,16 @@ def test_outline() -> None:
     assert article_23.updated == dt.date(2025, 12, 27)
 
 
+def test_outline_keeps_blocks_without_a_title() -> None:
+    # The Constitution, like many rules, leaves its preamble and signature untitled.
+    outline = parsing.parse_outline(fixture_data("outline-BOE-A-1978-31229.xml"))
+
+    assert len(outline) == 210
+    untitled = [entry.block_id for entry in outline if not entry.title]
+    assert untitled == ["preambulo", "firma"]
+    assert next(entry for entry in outline if entry.block_id == "a1").title == "Artículo 1"
+
+
 def test_block_keeps_every_version_oldest_first_with_notes() -> None:
     block = parsing.parse_block(fixture_data("block-BOE-A-2018-16673-a2-5.xml"))
 

@@ -20,6 +20,7 @@ pytestmark = [pytest.mark.live, pytest.mark.anyio]
 DATA_PROTECTION_ACT = "BOE-A-2018-16673"  # Ley Orgánica 3/2018
 AMENDING_ACT = "BOE-A-2025-26698"  # Ley 10/2025, which rewrote its article 23
 REPEALED_ACT = "BOE-A-1992-26318"  # Ley 30/1992, repealed in 2021
+CIVIL_CODE = "BOE-A-1889-4763"  # 1889, with about 2,400 blocks and an untitled preamble
 
 
 @pytest.fixture
@@ -68,6 +69,15 @@ async def test_a_rule_has_status_outline_and_changes(client: Client) -> None:
     assert law["status"] == "in_force"
     assert any(entry["block_id"] == "a2-5" for entry in law["outline"])
     assert AMENDING_ACT in {change["law_id"] for change in law["later_changes"]}
+
+
+async def test_an_old_code_with_untitled_blocks_has_its_outline(client: Client) -> None:
+    law = await _call(client, "get_legislation", law_id=CIVIL_CODE)
+    titles = {entry["block_id"]: entry["title"] for entry in law["outline"]}
+
+    assert law["status"] == "in_force"
+    assert titles["preambulo"] == ""
+    assert titles["art1172"] == "Art 1172"
 
 
 async def test_an_article_has_its_wording_and_history(client: Client) -> None:
