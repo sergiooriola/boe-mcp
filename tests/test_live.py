@@ -21,6 +21,7 @@ DATA_PROTECTION_ACT = "BOE-A-2018-16673"  # Ley Orgánica 3/2018
 AMENDING_ACT = "BOE-A-2025-26698"  # Ley 10/2025, which rewrote its article 23
 REPEALED_ACT = "BOE-A-1992-26318"  # Ley 30/1992, repealed in 2021
 CIVIL_CODE = "BOE-A-1889-4763"  # 1889, with about 2,400 blocks and an untitled preamble
+CRIMINAL_PROCEDURE_ACT = "BOE-A-1882-6036"  # Ley de Enjuiciamiento Criminal
 
 
 @pytest.fixture
@@ -98,6 +99,15 @@ async def test_an_article_has_its_wording_and_history(client: Client) -> None:
     assert block["in_force"] is True
     assert block["text"].startswith("Artículo 23.")
     assert {AMENDING_ACT, DATA_PROTECTION_ACT} <= {v["introduced_by"] for v in versions}
+
+
+async def test_a_block_id_with_punctuation_is_read(client: Client) -> None:
+    block = await _call(
+        client, "read_legislation_block", law_id=CRIMINAL_PROCEDURE_ACT, block_id="a846bisa)"
+    )
+
+    assert block["title"] == "Artículo 846 bis a)"
+    assert block["text"].startswith("Artículo 846 bis a)")
 
 
 async def test_a_repealed_rule_is_not_in_force(client: Client) -> None:

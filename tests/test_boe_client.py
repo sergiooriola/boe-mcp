@@ -116,7 +116,15 @@ async def test_legislation_requests_metadata_analysis_and_outline(fake_boe: Fake
 @pytest.mark.anyio
 @pytest.mark.parametrize(
     ("law_id", "block_id"),
-    [("../../robots.txt", "a1"), ("BOE-A-2018-16673", "a1/../../x"), ("BOE-A-2018-16673?", "a1")],
+    [
+        ("../../robots.txt", "a1"),
+        ("BOE-A-2018-16673?", "a1"),
+        ("BOE-A-2018-16673", "a1/../../x"),
+        ("BOE-A-2018-16673", ".."),
+        ("BOE-A-2018-16673", "."),
+        ("BOE-A-2018-16673", "a1?x"),
+        ("BOE-A-2018-16673", "a1%2F"),
+    ],
 )
 async def test_identifiers_are_checked_before_any_request(
     fake_boe: FakeBoe, law_id: str, block_id: str
@@ -126,6 +134,28 @@ async def test_identifiers_are_checked_before_any_request(
             await BoeClient(http).block(law_id, block_id)
 
     assert fake_boe.requests == []
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("law_id", "block_id"),
+    [
+        ("BOE-A-1889-4763", "art.1863bis"),
+        ("BOE-A-1889-4763", "arts.1863bisa1873bis."),
+        ("BOE-A-1889-4763", "delofrecimientodelpagoydelaconsignacion"),
+        ("BOE-A-1882-6036", "a846bisa)"),
+        ("BOE-A-1944-6578", "a)actasderemisiondedocumentosporcorreo-2"),
+    ],
+)
+async def test_block_ids_from_real_outlines_are_requested_unchanged(
+    fake_boe: FakeBoe, law_id: str, block_id: str
+) -> None:
+    async with fake_boe.client() as http:
+        with pytest.raises(BoeNotFoundError):  # the fake BOE has no recording of these blocks
+            await BoeClient(http).block(law_id, block_id)
+
+    [request] = fake_boe.requests
+    assert request.url.raw_path.decode().endswith(f"/{law_id}/texto/bloque/{block_id}")
 
 
 def _client_answering(response: httpx.Response | Exception) -> httpx.AsyncClient:
