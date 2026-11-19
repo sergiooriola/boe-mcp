@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<response>
+  <status>
+    <code>200</code>
+    <text>ok</text>
+  </status>
+  <data>
+    <bloque id="art301" tipo="precepto" fecha_caducidad="20210603" titulo="Art 301">
+      <version id_norma="BOE-A-1889-4763" fecha_publicacion="18890725" fecha_vigencia="18890816">
+        <p class="articulo">Artículo 301.</p>
+        <p class="parrafo">Formado el consejo de familia por el Juez municipal, procederá aquél a dictar todas las medidas necesarias para atender a la persona y bienes del menor o incapacitado y constituir la tutela.</p>
+      </version>
+      <version id_norma="BOE-A-1983-28123" fecha_publicacion="19831026" fecha_vigencia="19831115">
+        <p class="articulo">Artículo 301.</p>
+        <p class="parrafo">Serán aplicables al defensor judicial las causa de inhabilidad, excusas y remoción de los tutores y curadores.</p>
+        <blockquote>
+          <p class="nota_pie">Se modifica por el art. 1 de la Ley 13/1983, de 24 de octubre. <a class="refPost">Ref. BOE-A-1983-28123</a>.</p>
+        </blockquote>
+      </version>
+      <version id_norma="BOE-A-2021-9233" fecha_publicacion="20210603" fecha_vigencia="20210903">
+        <p class="articulo">Artículo 301.</p>
+        <p class="parrafo">
+          <strong>(Derogado)</strong>
+        </p>
+        <blockquote>
+          <p class="nota_pie">Se deroga, con efectos de 3 de septiembre de 2021, por la disposición derogatoria única.3 de la Ley 8/2021, de 2 de junio. <a class="refPost">Ref. BOE-A-2021-9233#dd</a></p>
+          <p class="nota_pie">Se modifica por el art. 1 de la Ley 13/1983, de 24 de octubre. <a class="refPost">Ref. BOE-A-1983-28123</a>.</p>
+        </blockquote>
+      </version>
+    </bloque>
+  </data>
+</response>

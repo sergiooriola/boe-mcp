@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<response>
+  <status>
+    <code>200</code>
+    <text>ok</text>
+  </status>
+  <data>
+    <bloque id="art.1863bis" tipo="precepto" fecha_caducidad="19550815" titulo="Art. 1863 bis">
+      <version id_norma="BOE-A-1941-12345" fecha_publicacion="19411216" fecha_vigencia="19420105">
+        <p class="articulo">Artículo 1863 bis.</p>
+        <p class="parrafo">Para asegurar con garantía pignoraticia el cumplimiento de una obligación, podrá convenirse mediante pacto expreso que, no obstante lo dispuesto en el artículo mil ochocientos sesenta y tres, el deudor conserve en su poder la prenda sin desplazar su posesión al acreedor. Este gozará, en su caso, de la misma preferencia que aquel que tenga la prenda en su poder.</p>
+        <p class="parrafo">Los artículos comprendidos en la Sección primera de este capítulo serán aplicables, de modo supletorio, a esta modalidad de la prenda sin desplazamiento.</p>
+        <blockquote>
+          <p class="nota_pie">Se añade por el art. 3 de la Ley de 5 de diciembre de 1941. <a class="refPost">Ref. BOE-A-1941-12345</a>.</p>
+        </blockquote>
+      </version>
+      <version id_norma="BOE-A-1954-15448" fecha_publicacion="19541218" fecha_vigencia="19550815">
+        <p class="articulo">Artículo 1863 bis. <strong>(Derogado)</strong></p>
+        <blockquote>
+          <p class="nota_pie">Se deroga por la disposición final derogatoria de la Ley de 16 de diciembre de 1954. <a class="refPost">Ref. BOE-A-1954-15448</a>.</p>
+          <p class="nota_pie">Se añade por el art. 3 de la Ley de 5 de diciembre de 1941. <a class="refPost">Ref. BOE-A-1941-12345</a>.</p>
+        </blockquote>
+      </version>
+    </bloque>
+  </data>
+</response>

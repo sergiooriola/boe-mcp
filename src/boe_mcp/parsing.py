@@ -28,6 +28,18 @@ IMAGE_OMITTED = "[Imagen omitida: consúltela en boe.es]"
 _SECTION_CODE: TypeAdapter[SectionCode] = TypeAdapter(SectionCode)
 _LAW_ID_ORDER = re.compile(r"-(\d{4})-(\d+)$")
 _WHITESPACE = re.compile(r"\s+")
+_REPEAL_WORDS = r"(?:derogad[oa]s?|suprimid[oa]s?|anulad[oa]s?|sin contenido)"
+_REPEAL_LINE = re.compile(rf"\(?{_REPEAL_WORDS}\)?\.?", re.IGNORECASE)
+_REPEAL_AFTER_HEADING = re.compile(rf"\({_REPEAL_WORDS}\)\.?$", re.IGNORECASE)
+# Classes the BOE gives to the paragraphs of a heading; normative text uses others, such as
+# parrafo or sangrado.
+_HEADING_CLASSES = frozenset(
+    {
+        *("libro", "libro_num", "libro_tit", "titulo", "titulo_num", "titulo_tit"),
+        *("capitulo", "capitulo_num", "capitulo_tit", "seccion", "subseccion"),
+        *("articulo", "anexo", "anexo_num", "anexo_tit"),
+    }
+)
 
 
 class ParseError(ValueError):
@@ -81,6 +93,7 @@ class Block:
 
     kind: str
     title: str
+    lapsed_on: dt.date | None
     versions: list[tuple[BlockVersion, str]]
 
 
@@ -259,6 +272,7 @@ def parse_block(data: ET.Element) -> Block:
                 introduced_by=_attr(version, "id_norma"),
                 published=parse_date(_attr(version, "fecha_publicacion")),
                 in_force_from=_optional_date_attr(version, "fecha_vigencia"),
+                repealed=is_repeal_notice(version),
             ),
             version_text(version),
         )
@@ -266,7 +280,47 @@ def parse_block(data: ET.Element) -> Block:
     ]
     if not versions:
         raise ParseError("The block has no version.")
-    return Block(kind=_attr(block, "tipo"), title=block.get("titulo") or "", versions=versions)
+    return Block(
+        kind=_attr(block, "tipo"),
+        title=block.get("titulo") or "",
+        lapsed_on=_lapse_date(block),
+        versions=versions,
+    )
+
+
+def is_repeal_notice(version: ET.Element) -> bool:
+    """Whether a version only records that its block was repealed.
+
+    The BOE keeps a repealed block and adds a version with its heading and a notice such as
+    (Derogado), (Suprimido), (Anulado) or (Sin contenido), on a line of its own or at the end of
+    the heading, followed only by notes. Any normative text in the version means it is not one.
+    """
+    lines = [
+        (child, line) for child in version if child.tag != "blockquote" if (line := _flatten(child))
+    ]
+    if not lines:
+        return False
+    *heading, (last, text) = lines
+    if not all(_is_heading(paragraph) for paragraph, _ in heading):
+        return False
+    if _REPEAL_LINE.fullmatch(text):
+        return True
+    return not heading and _is_heading(last) and _REPEAL_AFTER_HEADING.search(text) is not None
+
+
+def _is_heading(paragraph: ET.Element) -> bool:
+    return paragraph.tag == "p" and paragraph.get("class") in _HEADING_CLASSES
+
+
+def _lapse_date(block: ET.Element) -> dt.date | None:
+    """When the BOE stopped showing the block (fecha_caducidad), if it did.
+
+    A few blocks have impossible dates, such as 00000015. All of those seen are repealed anyway.
+    """
+    try:
+        return _optional_date_attr(block, "fecha_caducidad")
+    except ValueError:
+        return None
 
 
 def version_text(version: ET.Element) -> str:

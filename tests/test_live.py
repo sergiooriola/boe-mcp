@@ -22,6 +22,7 @@ AMENDING_ACT = "BOE-A-2025-26698"  # Ley 10/2025, which rewrote its article 23
 REPEALED_ACT = "BOE-A-1992-26318"  # Ley 30/1992, repealed in 2021
 CIVIL_CODE = "BOE-A-1889-4763"  # 1889, with about 2,400 blocks and an untitled preamble
 CRIMINAL_PROCEDURE_ACT = "BOE-A-1882-6036"  # Ley de Enjuiciamiento Criminal
+COMMERCIAL_CODE = "BOE-A-1885-6627"  # Código de Comercio, whose maritime articles lapsed in 2014
 
 
 @pytest.fixture
@@ -114,6 +115,23 @@ async def test_a_block_id_with_punctuation_is_read(client: Client) -> None:
 
     assert block["title"] == "Artículo 846 bis a)"
     assert block["text"].startswith("Artículo 846 bis a)")
+
+
+async def test_an_article_repealed_on_its_own_is_not_in_force(client: Client) -> None:
+    block = await _call(
+        client, "read_legislation_block", law_id=CRIMINAL_PROCEDURE_ACT, block_id="a387"
+    )
+
+    assert block["law_status"] == "in_force"
+    assert block["in_force"] is False
+    assert block["current_version"]["repealed"] is True
+
+
+async def test_a_lapsed_article_is_not_in_force(client: Client) -> None:
+    block = await _call(client, "read_legislation_block", law_id=COMMERCIAL_CODE, block_id="a573")
+
+    assert block["in_force"] is False
+    assert block["lapsed_on"] == "2014-07-25"
 
 
 async def test_a_repealed_rule_is_not_in_force(client: Client) -> None:
