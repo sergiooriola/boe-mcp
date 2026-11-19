@@ -24,10 +24,12 @@ BASE_URL = "https://www.boe.es/datosabiertos/api/"
 USER_AGENT = f"boe-mcp/{version('boe-mcp')} (+https://github.com/sergiooriola/boe-mcp)"
 TIMEOUT_SECONDS = 15.0
 
-# Identifiers such as BOE-A-2018-16673 or BOCL-h-2018-90415, and block ids such as a2-5. They
-# go into URL paths, so anything else is rejected before a request is made.
+# Identifiers such as BOE-A-2018-16673 or BOCL-h-2018-90415, and block ids such as a2-5,
+# art.1863bis or a846bisa), as the BOE's outlines give them. They go into URL paths, so anything
+# else is rejected before a request is made. A block id needs a letter or a digit, because "."
+# or ".." alone would move up the path.
 LAW_ID = re.compile(r"^[A-Z]{2,6}-[A-Za-z]-\d{4}-\d{1,6}$")
-BLOCK_ID = re.compile(r"^[A-Za-z0-9]{1,20}(-[A-Za-z0-9]{1,20}){0,3}$")
+BLOCK_ID = re.compile(r"^(?=.*[A-Za-z0-9])[A-Za-z0-9.)-]{1,80}$")
 
 # httpx logs every request URL at INFO, and search URLs carry the words the user searched for,
 # which can name people. Its warnings and errors still get through.
