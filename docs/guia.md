@@ -1036,7 +1036,8 @@ Gateway limita el ritmo de peticiones antes de llegar al código.
 
 **¿Por qué Lambda y no un contenedor?**
 Unos cientos de peticiones al mes: Lambda cuesta céntimos y nada cuando no se usa, y Fargate se
-paga por hora encendida. El precio es el arranque en frío, de alrededor de un segundo.
+paga por hora encendida. El precio es el arranque en frío: unos dos segundos más en la primera
+petición tras un rato sin uso (entre 1,6 y 2,7 s, medidos en el despliegue).
 
 **¿Por qué no Bedrock AgentCore?**
 Es el servicio gestionado de AWS para alojar agentes y servidores MCP, y sería mi candidato en
