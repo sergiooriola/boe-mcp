@@ -18,12 +18,12 @@ Gateway with Terraform.
 | --- | --- |
 | `get_daily_summary` | What the BOE published on a day (today by default), by section, with links to the signed PDFs |
 | `search_legislation` | Find a rule in the consolidated collection by title words, full-text words or official number |
-| `get_legislation` | Whether a rule is in force today, its outline and the later rules that changed it |
+| `get_legislation` | Whether a rule is in force today, its outline (a page at a time, filtered by words of the headings) and the later rules that changed it |
 | `read_legislation_block` | The latest wording of one article or other block, whether it is in force today, any wording approved for later, and its history |
 
 All four are read-only. A typical question, «¿Ha cambiado el artículo 23 de la ley de protección
-de datos?», makes the model search for `3/2018`, read the outline of `BOE-A-2018-16673`, and
-read block `a2-5`, which Ley 10/2025 rewrote with effect from 28 December 2025.
+de datos?», makes the model search for `3/2018`, look up `23` in the outline of `BOE-A-2018-16673`,
+and read block `a2-5`, which Ley 10/2025 rewrote with effect from 28 December 2025.
 
 ## How it works
 

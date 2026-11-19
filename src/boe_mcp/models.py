@@ -136,7 +136,14 @@ class Legislation(BaseModel):
     url: HttpUrl
     eli_url: HttpUrl | None = Field(default=None, description="European Legislation Identifier.")
     subjects: list[str] = Field(description="Subject terms assigned by the BOE.")
-    outline: list[OutlineEntry]
+    outline: list[OutlineEntry] = Field(
+        description="Blocks in text order that match outline_contains, one page at a time."
+    )
+    outline_total: int = Field(description="Blocks that match outline_contains, before paging.")
+    outline_next_offset: int | None = Field(
+        default=None,
+        description="Pass it as outline_offset to get the next page; null on the last page.",
+    )
     later_changes_total: int
     later_changes: list[LaterChange] = Field(
         description="Most recent changes first, capped; later_changes_total says how many exist."

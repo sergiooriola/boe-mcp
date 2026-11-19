@@ -82,11 +82,17 @@ async def test_a_rule_has_status_outline_and_changes(client: Client) -> None:
 
 async def test_an_old_code_with_untitled_blocks_has_its_outline(client: Client) -> None:
     law = await _call(client, "get_legislation", law_id=CIVIL_CODE)
-    titles = {entry["block_id"]: entry["title"] for entry in law["outline"]}
 
     assert law["status"] == "in_force"
-    assert titles["preambulo"] == ""
-    assert titles["art1172"] == "Art 1172"
+    assert law["outline"][0] == {"block_id": "preambulo", "title": "", "updated": "1889-07-25"}
+    assert law["outline_total"] > len(law["outline"])
+    assert law["outline_next_offset"] == len(law["outline"])
+
+
+async def test_an_article_of_a_large_code_is_found_by_its_number(client: Client) -> None:
+    law = await _call(client, "get_legislation", law_id=CIVIL_CODE, outline_contains="1172")
+
+    assert law["outline"] == [{"block_id": "art1172", "title": "Art 1172", "updated": "1889-07-25"}]
 
 
 async def test_an_article_has_its_wording_and_history(client: Client) -> None:

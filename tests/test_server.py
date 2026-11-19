@@ -117,9 +117,50 @@ async def test_get_legislation(client: Client) -> None:
     assert law["status"] == "in_force"
     assert law["official_number"] == "3/2018"
     assert len(law["outline"]) == 169
+    assert law["outline_total"] == 169
+    assert law["outline_next_offset"] is None
     assert law["later_changes_total"] == 7
     assert law["later_changes"][0]["law_id"] == "BOE-A-2025-26698"
     assert "meramente informativo" in law["notice"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("contains", "block_ids"),
+    [
+        ("2", ["a2", "s2", "s2-2"]),  # not Artículo 12, 20 or 23
+        ("ARTICULO 2", ["a2"]),
+        ("artículo 23", ["a2-5"]),
+        ("artículo 999", []),
+    ],
+)
+async def test_outline_is_filtered_by_whole_words_of_the_heading(
+    client: Client, contains: str, block_ids: list[str]
+) -> None:
+    law = await _call(
+        client, "get_legislation", law_id="BOE-A-2018-16673", outline_contains=contains
+    )
+
+    assert [entry["block_id"] for entry in law["outline"]] == block_ids
+    assert law["outline_total"] == len(block_ids)
+
+
+@pytest.mark.anyio
+async def test_outline_comes_a_page_at_a_time(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("boe_mcp.server.OUTLINE_PAGE", 100)
+
+    first = await _call(client, "get_legislation", law_id="BOE-A-2018-16673")
+    last = await _call(client, "get_legislation", law_id="BOE-A-2018-16673", outline_offset=100)
+
+    assert (len(first["outline"]), first["outline_total"], first["outline_next_offset"]) == (
+        100,
+        169,
+        100,
+    )
+    assert (len(last["outline"]), last["outline_next_offset"]) == (69, None)
+    assert first["outline"][-1] != last["outline"][0]
 
 
 @pytest.mark.anyio

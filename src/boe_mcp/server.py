@@ -3,6 +3,7 @@
 import asyncio
 import datetime as dt
 import logging
+import re
 import time
 import unicodedata
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -44,8 +45,13 @@ logger = logging.getLogger(__name__)
 
 MADRID = ZoneInfo("Europe/Madrid")
 MAX_LATER_CHANGES = 30
+# Claude Code moves a tool result over 50,000 characters out of the conversation into a file.
+# With 200 outline blocks the largest answer seen, from the Ley Orgánica del Poder Judicial and
+# its long headings, has about 33,000; the whole Código Civil, 2,444 blocks, would have 250,000.
+OUTLINE_PAGE = 200
 # A rule whose repeal is only scheduled is still in force today.
 IN_FORCE_STATUSES = frozenset({Status.IN_FORCE, Status.REPEAL_SCHEDULED})
+_HEADING_WORD = re.compile(r"\w+")
 
 INSTRUCTIONS = """\
 Read Spain's official gazette, the Boletín Oficial del Estado (BOE), from its open-data API.
@@ -55,9 +61,10 @@ Read Spain's official gazette, the Boletín Oficial del Estado (BOE), from its o
 - get_legislation: whether a rule is in force, its outline and the later rules that changed it.
 - read_legislation_block: the current wording of one article or other block of a rule.
 
-To quote an article: search_legislation, then get_legislation for the outline, then
-read_legislation_block with the block_id of that article. Answer with the BOE identifier and the
-link, and say that consolidated texts are informative: only the signed PDF of the BOE is official.
+To quote an article: search_legislation, then get_legislation with outline_contains set to the
+article number to find its block_id, then read_legislation_block with that block_id. Answer with
+the BOE identifier and the link, and say that consolidated texts are informative: only the
+signed PDF of the BOE is official.
 """
 
 READ_ONLY = ToolAnnotations(read_only_hint=True, open_world_hint=True)
@@ -229,11 +236,22 @@ def create_server(
         law_id: Annotated[
             str, Field(description="BOE identifier, such as BOE-A-2018-16673.", max_length=40)
         ],
+        outline_contains: Annotated[
+            str | None,
+            Field(
+                description="Only outline blocks whose heading has every one of these whole "
+                "words. Case and accents are ignored. Headings differ between rules (Artículo 23, "
+                "Art 1172), so give an article by its number alone, such as 23 or 1863 bis.",
+                max_length=200,
+            ),
+        ] = None,
+        outline_offset: Annotated[int, Field(ge=0)] = 0,
     ) -> Legislation:
         """Describe one consolidated rule: its status today, its outline and its later changes.
 
-        Later changes come most recent first. Use the outline's block_id with
-        read_legislation_block to read an article.
+        Large rules have thousands of blocks, so the outline comes a page at a time and
+        outline_contains narrows it to the blocks you need. Later changes come most recent
+        first. Use the outline's block_id with read_legislation_block to read an article.
         """
         app = ctx.request_context.lifespan_context
         metadata, analysis, outline = await _run(
@@ -243,6 +261,9 @@ def create_server(
             "Use search_legislation to find the identifier of the rule.",
         )
         status = parsing.status_on(metadata, app.today())
+        wanted = _heading_words(outline_contains)
+        matching = [entry for entry in outline if wanted <= _heading_words(entry.title)]
+        end = outline_offset + OUTLINE_PAGE
         return Legislation(
             id=metadata.id,
             title=metadata.title,
@@ -260,7 +281,9 @@ def create_server(
             url=HttpUrl(metadata.url),
             eli_url=HttpUrl(metadata.eli_url) if metadata.eli_url else None,
             subjects=analysis.subjects,
-            outline=outline,
+            outline=matching[outline_offset:end],
+            outline_total=len(matching),
+            outline_next_offset=end if end < len(matching) else None,
             later_changes_total=len(analysis.later_changes),
             later_changes=analysis.later_changes[:MAX_LATER_CHANGES],
         )
@@ -287,7 +310,8 @@ def create_server(
             "read_legislation_block",
             asyncio.gather(app.boe.metadata(law_id), app.boe.block(law_id, block_id)),
             not_found=f"{law_id} has no block {block_id!r}. Call get_legislation for the "
-            "outline and use one of its block_id values.",
+            "outline, with outline_contains set to the article number, and use one of its "
+            "block_id values.",
         )
         today = app.today()
         law_status = parsing.status_on(metadata, today)
@@ -358,6 +382,11 @@ def _in_force_by(version: BlockVersion, today: dt.date) -> bool:
 
 def _words(value: str | None) -> list[str]:
     return _normalise(value).split() if value else []
+
+
+def _heading_words(value: str | None) -> set[str]:
+    """Whole words of a heading, so that 2 finds Artículo 2 but not Artículo 23 or 12."""
+    return set(_HEADING_WORD.findall(_normalise(value))) if value else set()
 
 
 def _normalise(value: str) -> str:
