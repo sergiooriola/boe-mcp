@@ -1082,9 +1082,8 @@ la LO 3/2018. Al preguntar por el Código Civil aparecieron cinco fallos: el BOE
 títulos que la LO 3/2018 rellena, usa identificadores de bloque con puntos y paréntesis, ignora
 un rango de fechas con un solo extremo aunque su guía diga lo contrario y marca los artículos
 derogados de dos formas distintas, y el índice del Código no cabía en la conversación. Lo
-corregí en cinco PR
-pequeñas, cada una con una prueba que fallaba antes, y medí los arreglos contra una docena de
-normas reales, de 1862 a 2018.
+corregí en cinco PR pequeñas, cada una con una prueba que fallaba antes, y medí los arreglos
+contra una docena de normas reales, de 1862 a 2018.
 
 **¿Qué mejorarías primero?**
 Que `read_legislation_block` devuelva también el texto de una versión anterior, porque en la
