@@ -31,7 +31,15 @@ _WHITESPACE = re.compile(r"\s+")
 _REPEAL_WORDS = r"(?:derogad[oa]s?|suprimid[oa]s?|anulad[oa]s?|sin contenido)"
 _REPEAL_LINE = re.compile(rf"\(?{_REPEAL_WORDS}\)?\.?", re.IGNORECASE)
 _REPEAL_AFTER_HEADING = re.compile(rf"\({_REPEAL_WORDS}\)\.?$", re.IGNORECASE)
-_MAX_HEADING_CHARS = 100
+# Classes the BOE gives to the paragraphs of a heading; normative text uses others, such as
+# parrafo or sangrado.
+_HEADING_CLASSES = frozenset(
+    {
+        *("libro", "libro_num", "libro_tit", "titulo", "titulo_num", "titulo_tit"),
+        *("capitulo", "capitulo_num", "capitulo_tit", "seccion", "subseccion"),
+        *("articulo", "anexo", "anexo_num", "anexo_tit"),
+    }
+)
 
 
 class ParseError(ValueError):
@@ -285,19 +293,23 @@ def is_repeal_notice(version: ET.Element) -> bool:
 
     The BOE keeps a repealed block and adds a version with its heading and a notice such as
     (Derogado), (Suprimido), (Anulado) or (Sin contenido), on a line of its own or at the end of
-    the heading, followed only by notes. A heading takes one line, or two for titles and chapters.
+    the heading, followed only by notes. Any normative text in the version means it is not one.
     """
-    lines = [line for child in version if child.tag != "blockquote" if (line := _flatten(child))]
+    lines = [
+        (child, line) for child in version if child.tag != "blockquote" if (line := _flatten(child))
+    ]
     if not lines:
         return False
-    *heading, last = lines
-    if len(heading) <= 2 and _REPEAL_LINE.fullmatch(last):
+    *heading, (last, text) = lines
+    if not all(_is_heading(paragraph) for paragraph, _ in heading):
+        return False
+    if _REPEAL_LINE.fullmatch(text):
         return True
-    return (
-        not heading
-        and len(last) <= _MAX_HEADING_CHARS
-        and _REPEAL_AFTER_HEADING.search(last) is not None
-    )
+    return not heading and _is_heading(last) and _REPEAL_AFTER_HEADING.search(text) is not None
+
+
+def _is_heading(paragraph: ET.Element) -> bool:
+    return paragraph.tag == "p" and paragraph.get("class") in _HEADING_CLASSES
 
 
 def _lapse_date(block: ET.Element) -> dt.date | None:

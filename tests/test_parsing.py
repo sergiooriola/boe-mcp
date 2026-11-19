@@ -157,12 +157,19 @@ def test_only_the_version_that_repeals_a_block_is_a_repeal_notice(fixture: str) 
 @pytest.mark.parametrize(
     "version",
     [
-        "<version><p>Artículo 1654.</p><p>Queda suprimido el contrato de subenfiteusis.</p>"
+        # Article 1654 of the Código Civil, in force.
+        '<version><p class="articulo">Artículo 1654.</p>'
+        '<p class="parrafo">Queda suprimido para lo sucesivo el contrato de subenfiteusis.</p>'
         "</version>",
-        "<version><p>Artículo 12. Se aplica el régimen del artículo 5 de la Ley 30/1992, de 26 de "
-        "noviembre, y de su reglamento (derogado).</p></version>",
-        "<version><p>Artículo 9.</p><p>1. Texto.</p><p>2. Texto.</p><p>(Derogado)</p></version>",
-        "<version><blockquote><p>(Derogado)</p></blockquote></version>",
+        # A section still in force before a repealed one.
+        '<version><p class="articulo">Artículo 9.</p><p class="parrafo">1. Texto vigente.</p>'
+        '<p class="parrafo">(Derogado)</p></version>',
+        # Normative text that ends by naming a repealed rule.
+        '<version><p class="parrafo">Se aplicará el artículo 5 de la Ley 30/1992 (derogada).</p>'
+        "</version>",
+        # A notice inside a note only.
+        '<version><p class="articulo">Artículo 2.</p><blockquote><p class="nota_pie">(Derogado)'
+        "</p></blockquote></version>",
     ],
 )
 def test_wording_that_mentions_a_repeal_is_not_a_repeal_notice(version: str) -> None:
