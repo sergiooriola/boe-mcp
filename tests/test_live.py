@@ -62,6 +62,14 @@ async def test_a_rule_is_found_by_its_official_number(client: Client) -> None:
     assert DATA_PROTECTION_ACT in {result["id"] for result in found["results"]}
 
 
+async def test_search_with_only_an_end_date_filters_by_it(client: Client) -> None:
+    found = await _call(
+        client, "search_legislation", title_words="Código Civil", published_to="1890-12-31"
+    )
+
+    assert [result["id"] for result in found["results"]] == ["BOE-A-1889-4763"]
+
+
 async def test_a_rule_has_status_outline_and_changes(client: Client) -> None:
     law = await _call(client, "get_legislation", law_id=DATA_PROTECTION_ACT)
 

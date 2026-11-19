@@ -87,13 +87,12 @@ def build_search_query(
     if only_in_force:
         conditions.append("vigencia_agotada:N")
     query: dict[str, object] = {"query_string": {"query": " and ".join(conditions)}}
-    published: dict[str, str] = {}
-    if published_from is not None:
-        published["gte"] = published_from.strftime("%Y%m%d")
-    if published_to is not None:
-        published["lte"] = published_to.strftime("%Y%m%d")
-    if published:
-        query["range"] = {"fecha_publicacion": published}
+    if published_from is not None or published_to is not None:
+        # The BOE's documentation says either end of a range can be left out, but the API
+        # ignores a range with one end only, so an open end is sent as the first or last date.
+        start = published_from or dt.date.min
+        end = published_to or dt.date.max
+        query["range"] = {"fecha_publicacion": {"gte": f"{start:%Y%m%d}", "lte": f"{end:%Y%m%d}"}}
     return json.dumps({"query": query, "sort": [{"fecha_publicacion": "desc"}]})
 
 

@@ -62,6 +62,23 @@ def test_query_filters_by_force_and_publication_dates() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("published_from", "published_to", "published"),
+    [
+        (None, dt.date(1890, 12, 31), {"gte": "00010101", "lte": "18901231"}),
+        (dt.date(2025, 1, 1), None, {"gte": "20250101", "lte": "99991231"}),
+    ],
+)
+def test_query_sends_both_ends_of_an_open_date_range(
+    published_from: dt.date | None, published_to: dt.date | None, published: dict[str, str]
+) -> None:
+    query = _query(
+        title_words="Código Civil", published_from=published_from, published_to=published_to
+    )
+
+    assert query["query"]["range"] == {"fecha_publicacion": published}  # type: ignore[index]
+
+
 def test_query_input_cannot_add_operators_or_fields() -> None:
     query = _query(title_words='ley) or (rango@codigo:1300 NOT "x" _ -')
 
